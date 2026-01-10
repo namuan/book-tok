@@ -149,4 +149,28 @@ Thread: https://ampcode.com/threads/T-019ba8f1-b1ae-7100-ac54-25e5cf477125
   - Paragraph detection: split on `\n\s*\n` regex, filter paragraphs < 20 chars
   - Snippet constants: MIN_LENGTH=100, MAX_LENGTH=3500, TARGET_LENGTH=800
   - Clear mypy cache if pyproject.toml config changes aren't picked up
+- Snippet formatting is in `src/booktok/snippet_formatter.py` with SnippetFormatter class
+- Telegram message limit is 4096 chars; use HEADER_RESERVE=200 for safe content
+- Use `validate_message_length()` utility function to check message lengths
+---
+
+## 2026-01-10 - US-008
+Thread: https://ampcode.com/threads/T-019ba8f5-d61e-764e-addf-06966835de02
+- What was implemented:
+  - Created SnippetFormatter class for Telegram message formatting
+  - Implemented FormattedMessage and FormattedSnippet dataclasses
+  - Message length validation against Telegram 4096 char limit
+  - Long snippet splitting across multiple messages with continuation markers
+  - Header with book title, author (with emoji), and progress indicator
+  - Markdown escaping for special characters
+  - Paragraph break formatting for clean display
+- Files changed:
+  - src/booktok/snippet_formatter.py - New file with formatter logic
+  - src/booktok/__init__.py - Added exports for formatter classes
+- **Learnings for future iterations:**
+  - TELEGRAM_MAX_MESSAGE_LENGTH = 4096 chars per message
+  - Reserve 200 chars for header when calculating safe content length
+  - Split at paragraph boundaries first, then sentence boundaries, then word
+  - Use emojis: 📚 for book title, ✍️ for author, 📖 for progress
+  - Escape Markdown special chars: _ * [ ] ( ) ~ ` > # + - = | { } . !
 ---
