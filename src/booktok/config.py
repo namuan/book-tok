@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+from dotenv import load_dotenv
+
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +66,12 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     Returns:
         AppConfig with all settings loaded.
     """
+    load_dotenv()
     config = AppConfig()
 
     database_path = os.environ.get("BOOKTOK_DB_PATH")
     if database_path:
-        config.database.path = database_path
+        config.database.path = os.path.expanduser(database_path)
 
     db_retries = os.environ.get("BOOKTOK_DB_MAX_RETRIES")
     if db_retries:
