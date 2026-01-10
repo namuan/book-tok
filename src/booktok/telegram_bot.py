@@ -616,7 +616,8 @@ class TelegramBotInterface:
             # Show progress
             progress_pct = (new_position / total_snippets) * 100
             await update.message.reply_text(
-                f"📖 *Progress*: {new_position}/{total_snippets} ({progress_pct:.1f}%)",
+                f"📖 *Progress*: {new_position}/{total_snippets} ({progress_pct:.1f}%)\n\n"
+                "Tap /next to continue reading.",
                 parse_mode="Markdown",
             )
 
