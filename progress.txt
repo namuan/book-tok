@@ -255,4 +255,29 @@ Thread: https://ampcode.com/threads/T-019ba8fe-dcc9-7412-909a-8572e0046bc7
   - DeliveryScheduleRepository already exists in repository.py with full CRUD
   - Next delivery times are stored in UTC, converted to local for display
   - Frequency enum: DAILY, TWICE_DAILY, WEEKLY from models.py
----
+  - AutomatedDeliveryRunner in delivery_scheduler.py handles background scheduled delivery
+  - Use `SendMessageFunc = Callable[[int, str], asyncio.Future[bool]]` type for message sending callback
+  - `list_pending_deliveries(before: datetime)` retrieves schedules ready for delivery
+
+  ---
+
+  ## 2026-01-10 - US-013
+  Thread: https://ampcode.com/threads/T-019ba901-4518-75ee-a03b-a22a71ece181
+  - What was implemented:
+    - Created AutomatedDeliveryRunner class with background async task loop
+    - Background task checks for pending deliveries periodically (configurable interval)
+    - Scheduled delivery executes when next_delivery_at <= now (UTC)
+    - User timezone respected via stored user.timezone for next delivery calculation
+    - Message sent via injectable send_message_func callback for Telegram API
+    - System continues running with asyncio task, start()/stop() methods for lifecycle
+    - Added DeliveryResult dataclass for structured delivery attempt results
+    - run_once() method for testing/manual triggering
+  - Files changed:
+    - src/booktok/delivery_scheduler.py - Added AutomatedDeliveryRunner, DeliveryResult
+    - src/booktok/__init__.py - Exported new classes
+  - **Learnings for future iterations:**
+    - Use SendMessageFunc type alias for Telegram message callbacks
+    - AutomatedDeliveryRunner.start() creates asyncio.Task for background loop
+    - _update_schedule_after_delivery() sets last_delivered_at and calculates next_delivery_at
+    - For TWICE_DAILY frequency, adds 12 hours (not next day)
+  ---
