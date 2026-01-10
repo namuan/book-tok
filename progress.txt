@@ -8,6 +8,8 @@
 - Repository pattern: use `DatabaseConnectionManager` from `src/booktok/repository.py`
 - Use `with db.transaction()` context manager for write operations (auto commit/rollback)
 - SQLite stores booleans as INTEGER (0/1) - convert when reading rows
+- ebooklib lacks type stubs - mypy override for "ebooklib.*" is in pyproject.toml
+- Book text extraction is in `src/booktok/book_processor.py` with BookProcessor class
 
 ---
 
@@ -79,4 +81,23 @@ Thread: https://ampcode.com/threads/T-019ba8e9-8dfb-7368-93a9-69385ec26836
   - PdfReadError is in PyPDF2.errors module
   - Image-based PDFs won't yield text - need to detect and report this
   - Hyphenation across lines is handled by regex: r"(\w)-\s*\n\s*(\w)" -> r"\1\2"
+---
+
+## 2026-01-10 - US-005
+Thread: https://ampcode.com/threads/T-019ba8eb-4b56-726a-922f-d9b69a7d1edc
+- What was implemented:
+  - Extended BookProcessor with EPUB text extraction using ebooklib
+  - Added BeautifulSoup for HTML parsing of EPUB content
+  - Strips script/style tags, extracts text with proper separator
+  - Error handling for invalid/corrupted EPUBs (catches EpubException)
+  - Uses same _clean_and_normalize_text method as PDF for consistency
+- Files changed:
+  - src/booktok/book_processor.py - Added _extract_epub_text method, updated imports
+  - pyproject.toml - Added beautifulsoup4 dependency, mypy override for ebooklib
+  - uv.lock - Updated with new dependency
+- **Learnings for future iterations:**
+  - ebooklib lacks type stubs - need mypy override in pyproject.toml
+  - Use `epub.read_epub(path, options={"ignore_ncx": True})` to avoid NCX parsing issues
+  - EPUB items of type ITEM_DOCUMENT contain the readable content
+  - BeautifulSoup `get_text(separator="\n")` preserves paragraph structure
 ---
