@@ -1,15 +1,19 @@
 """Delivery scheduler for managing user book snippet delivery schedules."""
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 from booktok.models import DeliverySchedule, Frequency, User
 from booktok.repository import (
+    BookRepository,
     DatabaseConnectionManager,
     DeliveryScheduleRepository,
+    SnippetRepository,
+    UserProgressRepository,
     UserRepository,
 )
 
@@ -397,3 +401,321 @@ class DeliveryScheduler:
                 next_local += timedelta(weeks=1)
         
         return next_local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+
+@dataclass
+class DeliveryResult:
+    """Result of a scheduled delivery attempt."""
+    
+    schedule_id: int
+    user_id: int
+    book_id: int
+    success: bool
+    message: str
+    snippet_position: Optional[int] = None
+    error: Optional[str] = None
+
+
+SendMessageFunc = Callable[[int, str], "asyncio.Future[bool]"]
+
+
+class AutomatedDeliveryRunner:
+    """Handles automated scheduled delivery of book snippets."""
+    
+    def __init__(
+        self,
+        db_manager: DatabaseConnectionManager,
+        send_message_func: SendMessageFunc,
+        check_interval_seconds: int = 60,
+    ) -> None:
+        """Initialize the automated delivery runner.
+        
+        Args:
+            db_manager: Database connection manager.
+            send_message_func: Async function to send messages via Telegram.
+                              Takes (telegram_id, message_text) and returns success bool.
+            check_interval_seconds: How often to check for pending deliveries.
+        """
+        self.db_manager = db_manager
+        self.send_message_func = send_message_func
+        self.check_interval = check_interval_seconds
+        
+        self.schedule_repo = DeliveryScheduleRepository(db_manager)
+        self.user_repo = UserRepository(db_manager)
+        self.book_repo = BookRepository(db_manager)
+        self.snippet_repo = SnippetRepository(db_manager)
+        self.progress_repo = UserProgressRepository(db_manager)
+        
+        self._running = False
+        self._task: Optional[asyncio.Task[None]] = None
+    
+    async def start(self) -> None:
+        """Start the background delivery task."""
+        if self._running:
+            logger.warning("Delivery runner already running")
+            return
+        
+        self._running = True
+        self._task = asyncio.create_task(self._run_loop())
+        logger.info(
+            f"Started automated delivery runner (check interval: {self.check_interval}s)"
+        )
+    
+    async def stop(self) -> None:
+        """Stop the background delivery task."""
+        self._running = False
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+        logger.info("Stopped automated delivery runner")
+    
+    def is_running(self) -> bool:
+        """Check if the delivery runner is active.
+        
+        Returns:
+            True if running, False otherwise.
+        """
+        return self._running
+    
+    async def _run_loop(self) -> None:
+        """Main loop that periodically checks for pending deliveries."""
+        while self._running:
+            try:
+                await self._process_pending_deliveries()
+            except Exception as e:
+                logger.error(f"Error in delivery loop: {e}", exc_info=True)
+            
+            await asyncio.sleep(self.check_interval)
+    
+    async def _process_pending_deliveries(self) -> list[DeliveryResult]:
+        """Check for and process all pending deliveries.
+        
+        Returns:
+            List of delivery results.
+        """
+        now_utc = datetime.now(ZoneInfo("UTC")).replace(tzinfo=None)
+        pending_schedules = self.schedule_repo.list_pending_deliveries(now_utc)
+        
+        results: list[DeliveryResult] = []
+        
+        for schedule in pending_schedules:
+            try:
+                result = await self._deliver_snippet(schedule)
+                results.append(result)
+                
+                if result.success:
+                    self._update_schedule_after_delivery(schedule)
+                    logger.info(
+                        f"Delivered snippet {result.snippet_position} for schedule "
+                        f"{schedule.id} to user {schedule.user_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to deliver for schedule {schedule.id}: {result.error}"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Error processing schedule {schedule.id}: {e}",
+                    exc_info=True,
+                )
+                results.append(
+                    DeliveryResult(
+                        schedule_id=schedule.id or 0,
+                        user_id=schedule.user_id,
+                        book_id=schedule.book_id,
+                        success=False,
+                        message="Internal error during delivery",
+                        error=str(e),
+                    )
+                )
+        
+        return results
+    
+    async def _deliver_snippet(self, schedule: DeliverySchedule) -> DeliveryResult:
+        """Deliver the next snippet for a scheduled delivery.
+        
+        Args:
+            schedule: The delivery schedule to process.
+        
+        Returns:
+            DeliveryResult with success/failure information.
+        """
+        from booktok.snippet_formatter import SnippetFormatter
+        
+        user = self.user_repo.get_by_id(schedule.user_id)
+        if user is None:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="User not found",
+                error="User not found in database",
+            )
+        
+        book = self.book_repo.get_by_id(schedule.book_id)
+        if book is None:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="Book not found",
+                error="Book not found in database",
+            )
+        
+        progress = self.progress_repo.get_by_user_and_book(
+            schedule.user_id,
+            schedule.book_id,
+        )
+        
+        if progress is None:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="No progress record found",
+                error="UserProgress not found for user/book",
+            )
+        
+        if progress.is_completed:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="Book already completed",
+                error="Book is marked as completed",
+            )
+        
+        snippet = self.snippet_repo.get_by_book_and_position(
+            schedule.book_id,
+            progress.current_position,
+        )
+        
+        if snippet is None:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="No more snippets available",
+                error=f"Snippet at position {progress.current_position} not found",
+            )
+        
+        total_snippets = self.snippet_repo.count_by_book(book.id or 0)
+        formatter = SnippetFormatter(book, total_snippets=total_snippets)
+        formatted = formatter.format_snippet(snippet, progress)
+        
+        all_sent = True
+        for message in formatted.messages:
+            try:
+                success = await self.send_message_func(user.telegram_id, message.text)
+                if not success:
+                    all_sent = False
+                    break
+            except Exception as e:
+                logger.error(f"Failed to send message to {user.telegram_id}: {e}")
+                all_sent = False
+                break
+        
+        if all_sent:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=True,
+                message="Snippet delivered successfully",
+                snippet_position=progress.current_position,
+            )
+        else:
+            return DeliveryResult(
+                schedule_id=schedule.id or 0,
+                user_id=schedule.user_id,
+                book_id=schedule.book_id,
+                success=False,
+                message="Failed to send message via Telegram",
+                error="Telegram message delivery failed",
+            )
+    
+    def _update_schedule_after_delivery(self, schedule: DeliverySchedule) -> None:
+        """Update schedule after successful delivery.
+        
+        Args:
+            schedule: The schedule that was delivered.
+        """
+        user = self.user_repo.get_by_id(schedule.user_id)
+        user_tz = user.timezone if user else "UTC"
+        
+        now_utc = datetime.now(ZoneInfo("UTC")).replace(tzinfo=None)
+        schedule.last_delivered_at = now_utc
+        
+        next_delivery = self._calculate_next_delivery_for_schedule(
+            schedule.delivery_time,
+            schedule.frequency,
+            user_tz,
+        )
+        schedule.next_delivery_at = next_delivery
+        
+        self.schedule_repo.update(schedule)
+    
+    def _calculate_next_delivery_for_schedule(
+        self,
+        delivery_time: str,
+        frequency: Frequency,
+        timezone: str,
+    ) -> datetime:
+        """Calculate the next delivery datetime.
+        
+        Args:
+            delivery_time: Delivery time in HH:MM format.
+            frequency: Delivery frequency.
+            timezone: User's timezone.
+        
+        Returns:
+            Next delivery datetime in UTC.
+        """
+        try:
+            tz = ZoneInfo(timezone)
+        except Exception:
+            tz = ZoneInfo("UTC")
+        
+        now_utc = datetime.now(ZoneInfo("UTC"))
+        now_local = now_utc.astimezone(tz)
+        
+        hour, minute = map(int, delivery_time.split(":"))
+        
+        next_local = now_local.replace(
+            hour=hour,
+            minute=minute,
+            second=0,
+            microsecond=0,
+        )
+        
+        if frequency == Frequency.DAILY:
+            next_local += timedelta(days=1)
+        elif frequency == Frequency.TWICE_DAILY:
+            next_local += timedelta(hours=12)
+            if next_local <= now_local:
+                next_local += timedelta(hours=12)
+        elif frequency == Frequency.WEEKLY:
+            next_local += timedelta(weeks=1)
+        else:
+            next_local += timedelta(days=1)
+        
+        return next_local.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    
+    async def run_once(self) -> list[DeliveryResult]:
+        """Run a single check for pending deliveries.
+        
+        Useful for testing or manual triggering.
+        
+        Returns:
+            List of delivery results.
+        """
+        return await self._process_pending_deliveries()

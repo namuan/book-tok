@@ -36,6 +36,8 @@ from booktok.telegram_bot import (
     HELP_MESSAGE,
 )
 from booktok.delivery_scheduler import (
+    AutomatedDeliveryRunner,
+    DeliveryResult,
     DeliveryScheduler,
     ScheduleInfo,
     SchedulerError,
@@ -51,11 +53,13 @@ def main() -> None:
 
 
 __all__ = [
+    "AutomatedDeliveryRunner",
     "Book",
     "BookNotFoundError",
     "BookProcessor",
     "BookProcessingError",
     "BookStatus",
+    "DeliveryResult",
     "DeliverySchedule",
     "DeliveryScheduler",
     "FileType",
