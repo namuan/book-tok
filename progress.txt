@@ -300,3 +300,20 @@ Thread: https://ampcode.com/threads/T-019ba904-0e5b-726d-80a4-4d8cb590f979
   - When resuming, recalculate next_delivery_at based on user timezone
   - /next command bypasses the schedule entirely - always delivers from current position
 ---
+
+## 2026-01-10 - US-015
+Thread: https://ampcode.com/threads/T-019ba906-15d3-72e5-a7c9-06f0b3ae2f5c
+- What was implemented:
+  - Verified progress tracking implementation is already complete
+  - Progress updated in _handle_next (telegram_bot.py) and _deliver_snippet (delivery_scheduler.py)
+  - UserProgress model stores user_id, book_id, current_position with proper validation
+  - UserProgressRepository provides get_by_user_and_book() for retrieval
+  - Progress persisted via progress_repo.update() after every snippet delivery
+  - Updated PRD to mark US-015 as passes=true
+- Files changed:
+  - prd.json - Updated passes field for US-015
+- **Learnings for future iterations:**
+  - Progress tracking is implemented in two places: manual /next command and scheduled delivery
+  - Both use the same UserProgress model and repository for consistency
+  - current_position is 0-indexed in database, displayed as 1-indexed to users
+---
