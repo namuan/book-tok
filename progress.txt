@@ -19,6 +19,9 @@
 - Telegram bot interface is in `src/booktok/telegram_bot.py` with TelegramBotInterface class
 - Use Application.builder().token(token).build() for python-telegram-bot v20+
 - CommandHandler takes (command_name, handler_function) - command name without leading slash
+- Delivery scheduling in `src/booktok/delivery_scheduler.py` with DeliveryScheduler class
+- User timezone stored in User.timezone field, not in DeliverySchedule
+- Use zoneinfo.ZoneInfo for timezone handling; next_delivery_at stored in UTC
 
 ---
 
@@ -229,4 +232,27 @@ Thread: https://ampcode.com/threads/T-019ba8fd-06ef-73d7-a53f-36b19b45a529
   - SnippetFormatter handles all message formatting including headers and continuation markers
   - current_position in UserProgress is 0-indexed, but display is 1-indexed
   - snippet_repo.get_by_book_and_position() retrieves snippet by position, not ID
+---
+
+## 2026-01-10 - US-012
+Thread: https://ampcode.com/threads/T-019ba8fe-dcc9-7412-909a-8572e0046bc7
+- What was implemented:
+  - Created DeliveryScheduler class for managing user delivery schedules
+  - Implemented set_schedule() method to set/update delivery time and frequency
+  - Schedule stored in database via DeliveryScheduleRepository
+  - Timezone preference stored for each user in User model
+  - Created ScheduleInfo dataclass with format_for_display() for user-facing output
+  - Implemented get_schedule_info() and format_schedules_for_display() for retrieval
+  - Added update_user_timezone() to update user timezone preference
+  - Next delivery calculation based on user timezone
+  - Exception classes: SchedulerError, InvalidTimezoneError, InvalidScheduleError, UserNotFoundError, BookNotFoundError
+- Files changed:
+  - src/booktok/delivery_scheduler.py - New file with DeliveryScheduler class
+  - src/booktok/__init__.py - Added exports for scheduler classes
+- **Learnings for future iterations:**
+  - User timezone is stored in User model, not DeliverySchedule
+  - Use zoneinfo.ZoneInfo for timezone handling (Python 3.9+)
+  - DeliveryScheduleRepository already exists in repository.py with full CRUD
+  - Next delivery times are stored in UTC, converted to local for display
+  - Frequency enum: DAILY, TWICE_DAILY, WEEKLY from models.py
 ---
