@@ -15,6 +15,7 @@ from booktok.book_processor import (
     BookProcessor,
     BookProcessingError,
     InvalidFileError,
+    ProcessingResult,
     UnsupportedFileTypeError,
 )
 
@@ -32,6 +33,7 @@ __all__ = [
     "FileType",
     "Frequency",
     "InvalidFileError",
+    "ProcessingResult",
     "Snippet",
     "UnsupportedFileTypeError",
     "User",
