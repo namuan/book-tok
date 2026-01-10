@@ -373,6 +373,9 @@ class BookProcessor:
         Returns:
             Cleaned and normalized text.
         """
+        # Fix Unicode issues by encoding/decoding with error handling
+        text = text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+
         text = text.replace("\r\n", "\n").replace("\r", "\n")
 
         text = re.sub(r"[ \t]+", " ", text)

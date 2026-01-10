@@ -291,6 +291,20 @@ class BookRepository:
         row = cursor.fetchone()
         return self._row_to_book(row) if row else None
 
+    def get_by_file_path(self, file_path: str) -> Optional[Book]:
+        """Retrieve a book by file path.
+
+        Args:
+            file_path: File path of the book.
+
+        Returns:
+            Book if found, None otherwise.
+        """
+        conn = self.db.get_connection()
+        cursor = conn.execute("SELECT * FROM books WHERE file_path = ?", (file_path,))
+        row = cursor.fetchone()
+        return self._row_to_book(row) if row else None
+
     def update(self, book: Book) -> Book:
         """Update an existing book.
 

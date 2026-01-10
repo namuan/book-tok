@@ -9,6 +9,20 @@ from booktok.models import Book, Snippet, UserProgress
 
 logger = logging.getLogger(__name__)
 
+
+def sanitize_text_for_telegram(text: str) -> str:
+    """Sanitize text to remove invalid Unicode characters for Telegram.
+
+    Args:
+        text: The text to sanitize.
+
+    Returns:
+        Sanitized text safe for Telegram messages.
+    """
+    # Remove surrogate pairs and other invalid Unicode
+    return text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+
+
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 HEADER_RESERVE = 200
 SAFE_CONTENT_LENGTH = TELEGRAM_MAX_MESSAGE_LENGTH - HEADER_RESERVE
@@ -64,7 +78,9 @@ class SnippetFormatter:
             total_snippets: Total snippet count (defaults to book.total_snippets).
         """
         self.book = book
-        self.total_snippets = total_snippets if total_snippets is not None else book.total_snippets
+        self.total_snippets = (
+            total_snippets if total_snippets is not None else book.total_snippets
+        )
 
     def format_snippet(
         self,
@@ -84,8 +100,11 @@ class SnippetFormatter:
         if progress is not None:
             current_position = progress.current_position + 1
 
+        # Sanitize content to remove invalid Unicode
+        sanitized_content = sanitize_text_for_telegram(snippet.content)
+
         header = self._build_header(current_position)
-        content = self._format_content(snippet.content)
+        content = self._format_content(sanitized_content)
 
         full_message = f"{header}\n\n{content}"
 
@@ -113,10 +132,13 @@ class SnippetFormatter:
         """
         parts: list[str] = []
 
-        parts.append(f"📚 *{self._escape_markdown(self.book.title)}*")
+        # Sanitize and escape book title
+        safe_title = sanitize_text_for_telegram(self.book.title)
+        parts.append(f"📚 *{self._escape_markdown(safe_title)}*")
 
         if self.book.author:
-            parts.append(f"✍️ {self._escape_markdown(self.book.author)}")
+            safe_author = sanitize_text_for_telegram(self.book.author)
+            parts.append(f"✍️ {self._escape_markdown(safe_author)}")
 
         progress = f"📖 {current_position}/{self.total_snippets} snippets"
         parts.append(progress)
@@ -161,7 +183,9 @@ class SnippetFormatter:
         first_content_length = TELEGRAM_MAX_MESSAGE_LENGTH - len(header) - 10
         continuation_length = TELEGRAM_MAX_MESSAGE_LENGTH - 20
 
-        chunks = self._split_content_by_length(content, first_content_length, continuation_length)
+        chunks = self._split_content_by_length(
+            content, first_content_length, continuation_length
+        )
 
         for i, chunk in enumerate(chunks):
             if i == 0:
@@ -249,7 +273,26 @@ class SnippetFormatter:
         Returns:
             Escaped text safe for Telegram Markdown.
         """
-        special_chars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+        special_chars = [
+            "_",
+            "*",
+            "[",
+            "]",
+            "(",
+            ")",
+            "~",
+            "`",
+            ">",
+            "#",
+            "+",
+            "-",
+            "=",
+            "|",
+            "{",
+            "}",
+            ".",
+            "!",
+        ]
         result = text
         for char in special_chars:
             result = result.replace(char, f"\\{char}")

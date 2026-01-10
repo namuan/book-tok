@@ -4,19 +4,22 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
     filters,
 )
 
+from booktok.book_processor import BookProcessor
 from booktok.book_scanner import BookScanner
 from booktok.config import BooksConfig
 from booktok.delivery_scheduler import DeliveryScheduler
-from booktok.models import User, UserProgress
+from booktok.models import Book, BookStatus, User, UserProgress
+from booktok.snippet_generator import SnippetGenerator
 from booktok.repository import (
     BookRepository,
     DatabaseConnectionManager,
@@ -31,14 +34,27 @@ from booktok.snippet_formatter import SnippetFormatter
 logger = logging.getLogger(__name__)
 
 
+def sanitize_text_for_telegram(text: str) -> str:
+    """Sanitize text to remove invalid Unicode characters for Telegram.
+
+    Args:
+        text: The text to sanitize.
+
+    Returns:
+        Sanitized text safe for Telegram messages.
+    """
+    # Remove surrogate pairs and other invalid Unicode
+    return text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+
+
 WELCOME_MESSAGE = """📚 *Welcome to BookTok!*
 
 I'm your personal reading companion that delivers bite-sized learning snippets from your books.
 
 Here's how I work:
-1. Upload a PDF or EPUB book
-2. I'll extract it into digestible snippets
-3. Receive daily snippets at your preferred time
+1. Browse available books with /books
+2. Select a book to start reading
+3. Get snippets with /next or receive them automatically
 
 Use /help to see all available commands.
 
@@ -52,7 +68,7 @@ HELP_MESSAGE = """📖 *BookTok Commands*
 /help - Show this help message
 
 *Book Management:*
-/books - List available books to read
+/books - Browse and select books to read
 
 *Snippet Delivery:*
 /next - Get the next snippet immediately
@@ -143,6 +159,11 @@ class TelegramBotInterface:
         self.application.add_handler(CommandHandler("next", self._handle_next))
         self.application.add_handler(CommandHandler("pause", self._handle_pause))
         self.application.add_handler(CommandHandler("resume", self._handle_resume))
+
+        # Callback query handler for book selection
+        self.application.add_handler(
+            CallbackQueryHandler(self._handle_book_selection, pattern=r"^select_book:")
+        )
 
         self.application.add_handler(
             MessageHandler(
@@ -263,30 +284,225 @@ class TelegramBotInterface:
         # Build message with book list
         message_lines = ["📚 *Available Books*\n"]
         message_lines.append(f"Found {len(books)} book(s):\n")
+        message_lines.append("Select a book to start reading:\n")
 
+        # Create inline keyboard buttons for book selection
+        keyboard = []
         for idx, book in enumerate(books, start=1):
             size_str = self.book_scanner.format_size(book.size_bytes)
             file_type = book.file_type.value.upper()
             message_lines.append(
-                f"{idx}. *{book.display_name}*\n"
-                f"   📄 File: `{book.filename}`\n"
-                f"   📊 Type: {file_type} | Size: {size_str}\n"
+                f"{idx}. *{book.display_name}*\n" f"   📊 {file_type} | {size_str}"
             )
 
-        message_lines.append(
-            "\n💡 *Coming Soon:*\n"
-            "Selection and processing features are under development.\n"
-            "Stay tuned!"
-        )
+            # Add button for this book
+            button_text = f"{idx}. {book.display_name[:30]}"
+            callback_data = f"select_book:{book.filename}"
+            keyboard.append(
+                [InlineKeyboardButton(button_text, callback_data=callback_data)]
+            )
 
         message = "\n".join(message_lines)
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         await update.message.reply_text(
             message,
             parse_mode="Markdown",
+            reply_markup=reply_markup,
         )
 
         logger.info(f"User {telegram_id} listed {len(books)} available books")
+
+    async def _handle_book_selection(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle book selection from inline keyboard.
+
+        Processes the selected book, generates snippets, and starts user progress.
+
+        Args:
+            update: Telegram update object with callback query.
+            context: Callback context.
+        """
+        query = update.callback_query
+        if query is None or update.effective_user is None:
+            return
+
+        await query.answer()
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None or user.id is None:
+            await query.edit_message_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        # Extract filename from callback data
+        callback_data = query.data or ""
+        if not callback_data.startswith("select_book:"):
+            await query.edit_message_text("Invalid selection. Please try again.")
+            return
+
+        filename = callback_data.replace("select_book:", "")
+
+        # Get the book file
+        book_file = self.book_scanner.get_book_by_name(filename)
+        if book_file is None:
+            await query.edit_message_text(
+                f"\u274c *Book Not Found*\n\n"
+                f"The book `{filename}` could not be found.\n"
+                "Please use /books to see the current list.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Show processing message
+        await query.edit_message_text(
+            f"\u231b *Processing Book*\n\n"
+            f"Selected: *{book_file.display_name}*\n\n"
+            "Processing the book and generating snippets...\n"
+            "This may take a moment.",
+            parse_mode="Markdown",
+        )
+
+        try:
+            # Check if book already exists in database
+            existing_book = self.book_repo.get_by_file_path(str(book_file.path))
+            book = None
+            should_process = False
+
+            if existing_book is not None:
+                if (
+                    existing_book.status == BookStatus.COMPLETED
+                    and existing_book.total_snippets > 0
+                ):
+                    # Book already processed and valid
+                    book = existing_book
+                    logger.info(
+                        f"Book '{book.title}' already exists (ID: {book.id}), "
+                        f"linking to user {telegram_id}"
+                    )
+                else:
+                    # Book exists but is incomplete or failed, reprocess it
+                    book = existing_book
+                    should_process = True
+                    logger.info(
+                        f"Reprocessing existing book '{book.title}' (ID: {book.id}) "
+                        f"Status: {book.status}, Snippets: {book.total_snippets}"
+                    )
+            else:
+                # Create new book entry
+                book = Book(
+                    title=book_file.display_name,
+                    file_path=str(book_file.path),
+                    file_type=book_file.file_type,
+                    status=BookStatus.PROCESSING,
+                )
+                book = self.book_repo.create(book)
+                should_process = True
+                logger.info(f"Created book entry: {book.title} (ID: {book.id})")
+
+            if should_process:
+                # Update status to processing
+                if book.status != BookStatus.PROCESSING:
+                    book.status = BookStatus.PROCESSING
+                    self.book_repo.update(book)
+
+                # Clear any existing snippets if we are reprocessing
+                if existing_book:
+                    deleted_count = self.snippet_repo.delete_by_book(book.id)  # type: ignore
+                    logger.info(
+                        f"Deleted {deleted_count} old snippets for book {book.id}"
+                    )
+
+                # Process the book
+                processor = BookProcessor(book)
+                result = processor.process_book_safely()
+
+                if not result.success or result.text is None:
+                    book.status = BookStatus.FAILED
+                    self.book_repo.update(book)
+                    await query.edit_message_text(
+                        f"\u274c *Processing Failed*\n\n"
+                        f"{result.get_user_message()}",
+                        parse_mode="Markdown",
+                    )
+                    return
+
+                # Generate snippets
+                generator = SnippetGenerator(book)
+                snippets = generator.generate_snippets(result.text)
+
+                # Save snippets to database
+                for snippet in snippets:
+                    self.snippet_repo.create(snippet)
+
+                # Update book status
+                book.total_snippets = len(snippets)
+                book.status = BookStatus.COMPLETED
+                self.book_repo.update(book)
+
+                logger.info(
+                    f"Successfully processed book '{book.title}' "
+                    f"with {len(snippets)} snippets"
+                )
+
+            # Check if user has active progress on a different book
+            progress_list = self.progress_repo.list_by_user(user.id)
+            for progress in progress_list:
+                if not progress.is_completed and progress.book_id != book.id:
+                    # Mark old book progress as inactive/paused
+                    # For now, we just start fresh with the new book
+                    logger.info(
+                        f"User {telegram_id} switching from book {progress.book_id} "
+                        f"to book {book.id}"
+                    )
+
+            # Initialize or reset user progress for this book
+            existing_progress = self.progress_repo.get_by_user_and_book(
+                user.id, book.id or 0
+            )
+
+            if existing_progress is not None:
+                # Reset progress to start from beginning
+                existing_progress.current_position = 0
+                existing_progress.is_completed = False
+                existing_progress.completed_at = None
+                self.progress_repo.update(existing_progress)
+                progress = existing_progress
+                logger.info(
+                    f"Reset progress for user {telegram_id} on book '{book.title}'"
+                )
+            else:
+                # Create new progress
+                progress = self.progress_repo.initialize_progress(user.id, book.id or 0)
+                logger.info(
+                    f"Initialized progress for user {telegram_id} on book '{book.title}'"
+                )
+
+            # Send success message
+            title_safe = sanitize_text_for_telegram(book.title)
+            await query.edit_message_text(
+                f"\u2705 *Book Selected*\n\n"
+                f"*{title_safe}*\n\n"
+                f"📚 Total snippets: {book.total_snippets}\n"
+                f"📍 Your position: {progress.current_position + 1}/{book.total_snippets}\n\n"
+                "Use /next to start reading!",
+                parse_mode="Markdown",
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing book selection: {e}", exc_info=True)
+            await query.edit_message_text(
+                "\u274c *Error*\n\n"
+                "An error occurred while processing the book.\n"
+                "Please try again later or contact support.",
+                parse_mode="Markdown",
+            )
 
     async def _handle_next(
         self,
@@ -348,8 +564,9 @@ class TelegramBotInterface:
         )
 
         if snippet is None:
+            title_safe = sanitize_text_for_telegram(book.title)
             await update.message.reply_text(
-                f"📚 *{book.title}*\n\n"
+                f"📚 *{title_safe}*\n\n"
                 "No more snippets available. You've reached the end!",
                 parse_mode="Markdown",
             )
@@ -369,9 +586,10 @@ class TelegramBotInterface:
         if active_progress.current_position >= total_snippets:
             active_progress.is_completed = True
             active_progress.completed_at = datetime.utcnow()
+            title_safe = sanitize_text_for_telegram(book.title)
             await update.message.reply_text(
                 f"🎉 *Congratulations!*\n\n"
-                f"You've completed *{book.title}*!\n\n"
+                f"You've completed *{title_safe}*!\n\n"
                 f"📚 Total snippets read: {total_snippets}\n\n"
                 f"Great job on finishing this book! 🏆",
                 parse_mode="Markdown",

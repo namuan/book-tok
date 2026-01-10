@@ -40,4 +40,7 @@ dev = [
     "pytest",
     "ruff",
     "hypothesis",
+    "radon>=6.0.1",
+    "xenon>=0.9.3",
+    "skylos>=3.0.3",
 ]
