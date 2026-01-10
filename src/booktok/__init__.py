@@ -35,6 +35,15 @@ from booktok.telegram_bot import (
     WELCOME_MESSAGE,
     HELP_MESSAGE,
 )
+from booktok.delivery_scheduler import (
+    DeliveryScheduler,
+    ScheduleInfo,
+    SchedulerError,
+    InvalidTimezoneError,
+    InvalidScheduleError,
+    UserNotFoundError,
+    BookNotFoundError,
+)
 
 
 def main() -> None:
@@ -43,29 +52,36 @@ def main() -> None:
 
 __all__ = [
     "Book",
+    "BookNotFoundError",
     "BookProcessor",
     "BookProcessingError",
     "BookStatus",
     "DeliverySchedule",
+    "DeliveryScheduler",
     "FileType",
     "FormattedMessage",
     "FormattedSnippet",
     "Frequency",
+    "get_safe_content_length",
+    "HELP_MESSAGE",
     "InvalidFileError",
+    "InvalidScheduleError",
+    "InvalidTimezoneError",
+    "main",
     "ProcessingResult",
+    "ScheduleInfo",
+    "SchedulerError",
     "Snippet",
     "SnippetFormatter",
     "SnippetGenerationError",
     "SnippetGenerationResult",
     "SnippetGenerator",
+    "TelegramBotInterface",
     "UnsupportedFileTypeError",
     "User",
+    "UserNotFoundError",
     "UserProgress",
-    "ValidationError",
-    "get_safe_content_length",
-    "HELP_MESSAGE",
-    "main",
-    "TelegramBotInterface",
     "validate_message_length",
+    "ValidationError",
     "WELCOME_MESSAGE",
 ]

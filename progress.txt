@@ -213,3 +213,20 @@ Thread: https://ampcode.com/threads/T-019ba8fb-877b-75d5-96b3-d0dc5d700c30
   - MessageHandler with `filters.TEXT & ~filters.COMMAND` catches plain text messages
   - Telegram filter operators: `&` (and), `|` (or), `~` (not)
 ---
+
+## 2026-01-10 - US-011
+Thread: https://ampcode.com/threads/T-019ba8fd-06ef-73d7-a53f-36b19b45a529
+- What was implemented:
+  - Added /next command handler to TelegramBotInterface
+  - Fetches user's active book progress and delivers next snippet
+  - Uses SnippetFormatter to include book title, author, and progress indicator
+  - Multi-message support for long snippets (respects Telegram 4096 char limit)
+  - Added BookRepository, SnippetRepository, UserProgressRepository to TelegramBotInterface
+- Files changed:
+  - src/booktok/telegram_bot.py - Added /next command handler with snippet delivery
+- **Learnings for future iterations:**
+  - Use `progress_repo.list_by_user()` and filter for `is_completed=False` to find active books
+  - SnippetFormatter handles all message formatting including headers and continuation markers
+  - current_position in UserProgress is 0-indexed, but display is 1-indexed
+  - snippet_repo.get_by_book_and_position() retrieves snippet by position, not ID
+---
