@@ -6,15 +6,13 @@ import signal
 import sys
 from typing import Optional
 
-from telegram.ext import Application
 
 from booktok.config import AppConfig, load_config, setup_logging, validate_config
 from booktok.database import (
-    initialize_database,
     close_database,
     DatabaseConnectionError,
 )
-from booktok.delivery_scheduler import AutomatedDeliveryRunner, DeliveryScheduler
+from booktok.delivery_scheduler import AutomatedDeliveryRunner
 from booktok.repository import DatabaseConnectionManager
 from booktok.telegram_bot import TelegramBotInterface
 

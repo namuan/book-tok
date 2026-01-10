@@ -1,6 +1,6 @@
 """Data models for the BookTok Telegram bot."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -8,6 +8,7 @@ from typing import Optional
 
 class BookStatus(Enum):
     """Status of book processing."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -16,12 +17,14 @@ class BookStatus(Enum):
 
 class FileType(Enum):
     """Supported book file types."""
+
     PDF = "pdf"
     EPUB = "epub"
 
 
 class Frequency(Enum):
     """Delivery frequency options."""
+
     DAILY = "daily"
     TWICE_DAILY = "twice_daily"
     WEEKLY = "weekly"
@@ -29,12 +32,12 @@ class Frequency(Enum):
 
 class ValidationError(Exception):
     """Raised when model validation fails."""
-    pass
 
 
 @dataclass
 class User:
     """Represents a Telegram user of the bot."""
+
     telegram_id: int
     username: Optional[str] = None
     first_name: Optional[str] = None
@@ -46,7 +49,7 @@ class User:
 
     def validate(self) -> None:
         """Validate the user data.
-        
+
         Raises:
             ValidationError: If validation fails.
         """
@@ -71,6 +74,7 @@ class User:
 @dataclass
 class Book:
     """Represents a book that has been uploaded for processing."""
+
     title: str
     file_path: str
     file_type: FileType
@@ -83,7 +87,7 @@ class Book:
 
     def validate(self) -> None:
         """Validate the book data.
-        
+
         Raises:
             ValidationError: If validation fails.
         """
@@ -108,6 +112,7 @@ class Book:
 @dataclass
 class Snippet:
     """Represents a learning snippet extracted from a book."""
+
     book_id: int
     position: int
     content: str
@@ -116,7 +121,7 @@ class Snippet:
 
     def validate(self) -> None:
         """Validate the snippet data.
-        
+
         Raises:
             ValidationError: If validation fails.
         """
@@ -135,6 +140,7 @@ class Snippet:
 @dataclass
 class UserProgress:
     """Tracks a user's progress through a book."""
+
     user_id: int
     book_id: int
     current_position: int = 0
@@ -146,7 +152,7 @@ class UserProgress:
 
     def validate(self) -> None:
         """Validate the user progress data.
-        
+
         Raises:
             ValidationError: If validation fails.
         """
@@ -167,6 +173,7 @@ class UserProgress:
 @dataclass
 class DeliverySchedule:
     """Represents a user's delivery schedule for a book."""
+
     user_id: int
     book_id: int
     delivery_time: str
@@ -180,7 +187,7 @@ class DeliverySchedule:
 
     def validate(self) -> None:
         """Validate the delivery schedule data.
-        
+
         Raises:
             ValidationError: If validation fails.
         """
@@ -198,10 +205,10 @@ class DeliverySchedule:
 
     def _validate_time_format(self, time_str: str) -> None:
         """Validate that time is in HH:MM format.
-        
+
         Args:
             time_str: Time string to validate.
-            
+
         Raises:
             ValidationError: If time format is invalid.
         """
@@ -212,9 +219,13 @@ class DeliverySchedule:
             hour = int(parts[0])
             minute = int(parts[1])
             if not (0 <= hour <= 23 and 0 <= minute <= 59):
-                raise ValidationError("delivery_time must have valid hour (0-23) and minute (0-59)")
+                raise ValidationError(
+                    "delivery_time must have valid hour (0-23) and minute (0-59)"
+                )
         except ValueError:
-            raise ValidationError("delivery_time must be in HH:MM format with numeric values")
+            raise ValidationError(
+                "delivery_time must be in HH:MM format with numeric values"
+            )
 
     def __post_init__(self) -> None:
         """Validate after initialization."""

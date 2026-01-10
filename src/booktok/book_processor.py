@@ -1,7 +1,6 @@
 """Book processing module for extracting text from PDF and EPUB files."""
 
 import logging
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,19 +54,13 @@ class ProcessingResult:
 class BookProcessingError(Exception):
     """Raised when book processing fails."""
 
-    pass
-
 
 class InvalidFileError(BookProcessingError):
     """Raised when the file is invalid or corrupted."""
 
-    pass
-
 
 class UnsupportedFileTypeError(BookProcessingError):
     """Raised when the file type is not supported."""
-
-    pass
 
 
 class BookProcessor:
@@ -110,18 +103,14 @@ class BookProcessor:
             raise InvalidFileError(f"Cannot access file: {e}") from e
 
         if file_size < MIN_FILE_SIZE_BYTES:
-            logger.error(
-                f"File too small: {self.book.file_path} ({file_size} bytes)"
-            )
+            logger.error(f"File too small: {self.book.file_path} ({file_size} bytes)")
             raise InvalidFileError(
                 f"File is too small ({file_size} bytes). "
                 "The file may be empty or corrupted."
             )
 
         if file_size > MAX_FILE_SIZE_BYTES:
-            logger.error(
-                f"File too large: {self.book.file_path} ({file_size} bytes)"
-            )
+            logger.error(f"File too large: {self.book.file_path} ({file_size} bytes)")
             raise InvalidFileError(
                 f"File is too large ({file_size // (1024 * 1024)} MB). "
                 f"Maximum allowed size is {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
@@ -152,9 +141,7 @@ class BookProcessor:
 
         if self.book.file_type == FileType.PDF:
             if not header.startswith(PDF_MAGIC_BYTES):
-                logger.error(
-                    f"Invalid PDF magic bytes in {file_path}: {header[:4]!r}"
-                )
+                logger.error(f"Invalid PDF magic bytes in {file_path}: {header[:4]!r}")
                 raise InvalidFileError(
                     "The file does not appear to be a valid PDF. "
                     "Please ensure you have uploaded a proper PDF file."
@@ -212,7 +199,9 @@ class BookProcessor:
         Returns:
             ProcessingResult with success status and text or error details.
         """
-        logger.info(f"Starting processing for book: {self.book.title} (ID: {self.book.id})")
+        logger.info(
+            f"Starting processing for book: {self.book.title} (ID: {self.book.id})"
+        )
         self.book.status = BookStatus.PROCESSING
 
         try:
@@ -247,7 +236,7 @@ class BookProcessor:
             self._mark_as_failed()
             return ProcessingResult(
                 success=False,
-                error_message=f"The file type is not supported. Please upload a PDF or EPUB file.",
+                error_message="The file type is not supported. Please upload a PDF or EPUB file.",
                 error_type="unsupported_file_type",
                 details=error_msg,
             )
@@ -306,9 +295,7 @@ class BookProcessor:
             raise InvalidFileError(f"Invalid or corrupted PDF file: {e}") from e
         except Exception as e:
             logger.error(f"Unexpected error reading PDF {file_path}: {e}")
-            raise BookProcessingError(
-                f"Failed to open PDF file: {e}"
-            ) from e
+            raise BookProcessingError(f"Failed to open PDF file: {e}") from e
 
         if len(reader.pages) == 0:
             raise InvalidFileError("PDF file has no pages")
@@ -321,9 +308,7 @@ class BookProcessor:
                 if page_text:
                     text_parts.append(page_text)
             except Exception as e:
-                logger.warning(
-                    f"Failed to extract text from page {page_num + 1}: {e}"
-                )
+                logger.warning(f"Failed to extract text from page {page_num + 1}: {e}")
                 continue
 
         if not text_parts:

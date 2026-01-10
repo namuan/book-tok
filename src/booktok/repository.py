@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Generator, Optional
 
-from booktok.database import initialize_database, create_tables
+from booktok.database import create_tables
 from booktok.models import (
     Book,
     BookStatus,

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
-from booktok.models import DeliverySchedule, Frequency, User
+from booktok.models import DeliverySchedule, Frequency
 from booktok.repository import (
     BookRepository,
     DatabaseConnectionManager,
@@ -24,31 +24,21 @@ logger = logging.getLogger(__name__)
 class SchedulerError(Exception):
     """Base exception for scheduler errors."""
 
-    pass
-
 
 class InvalidTimezoneError(SchedulerError):
     """Raised when an invalid timezone is provided."""
-
-    pass
 
 
 class InvalidScheduleError(SchedulerError):
     """Raised when schedule parameters are invalid."""
 
-    pass
-
 
 class UserNotFoundError(SchedulerError):
     """Raised when user is not found."""
 
-    pass
-
 
 class BookNotFoundError(SchedulerError):
     """Raised when book is not found."""
-
-    pass
 
 
 @dataclass
@@ -83,7 +73,7 @@ class ScheduleInfo:
             lines.append(f"✍️ {self.book_author}")
         lines.extend(
             [
-                f"",
+                "",
                 f"⏰ *Delivery Time:* {self.local_delivery_time}",
                 f"📅 *Frequency:* {frequency_display}",
                 f"🌍 *Timezone:* {self.user_timezone}",

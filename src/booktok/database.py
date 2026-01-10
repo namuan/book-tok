@@ -12,25 +12,17 @@ logger = logging.getLogger(__name__)
 class DatabaseError(Exception):
     """Base exception for database errors."""
 
-    pass
-
 
 class DatabaseConnectionError(DatabaseError):
     """Raised when database connection fails."""
-
-    pass
 
 
 class DatabaseIntegrityError(DatabaseError):
     """Raised when data integrity check fails."""
 
-    pass
-
 
 class DatabaseCorruptedError(DatabaseError):
     """Raised when database corruption is detected."""
-
-    pass
 
 
 def get_database_path(db_name: str = "booktok.db") -> Path:
@@ -182,7 +174,7 @@ def create_tables(conn: sqlite3.Connection, verify_only: bool = False) -> None:
     for table_name, create_sql in tables:
         if verify_only:
             cursor.execute(
-                f"SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
                 (table_name,),
             )
             if cursor.fetchone() is None:
@@ -212,7 +204,7 @@ def create_tables(conn: sqlite3.Connection, verify_only: bool = False) -> None:
     for index_name, create_sql in indexes:
         if verify_only:
             cursor.execute(
-                f"SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+                "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
                 (index_name,),
             )
             if cursor.fetchone() is None:
@@ -248,7 +240,7 @@ def check_database_integrity(conn: sqlite3.Connection) -> bool:
             "delivery_schedules",
         ]:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cursor.fetchone()[0]
+            cursor.fetchone()[0]
 
             cursor.execute(f"SELECT COUNT(*) FROM {table} WHERE id IS NULL")
             null_ids = cursor.fetchone()[0]
@@ -282,7 +274,6 @@ def recover_database(db_path: Path) -> bool:
     logger.warning(f"Attempting database recovery for {db_path}")
 
     import shutil
-    import os
 
     backup_path = db_path.with_suffix(db_path.suffix + ".bak")
     try:
