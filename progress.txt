@@ -25,24 +25,24 @@
 
 ---
 
-## 2026-01-10 - US-017
-Thread: https://ampcode.com/threads/T-019ba908-1c5e-72e9-8c8c-39c07c7cb2ed
+## 2026-01-10 - US-018
+Thread: https://ampcode.com/threads/T-019ba909-1cbf-72db-8a2e-26c2ba9e2fb1
 - What was implemented:
-  - Added book completion detection in _handle_next (telegram_bot.py)
-  - Added book completion detection in _deliver_snippet (delivery_scheduler.py)
-  - Completion detected when current_position >= total_snippets
-  - is_completed set to True and completed_at timestamp set on completion
-  - Congratulatory message sent to user on book completion
-  - Updated prd.json to mark US-017 as passes=true
+  - Added _send_message_with_retry() method with exponential backoff
+  - MAX_RETRIES=5, INITIAL_BACKOFF=1s, BACKOFF_MULTIPLIER=2.0, MAX_BACKOFF=30s
+  - Retry logic catches exceptions and logs failures at each attempt
+  - Added attempts field to DeliveryResult for tracking
+  - Failed deliveries logged with error details for admin review
+  - Updated _deliver_snippet to use retry mechanism
+  - Updated prd.json to mark US-018 as passes=true
 - Files changed:
-  - src/booktok/telegram_bot.py - Added completion detection and congratulatory message
-  - src/booktok/delivery_scheduler.py - Added completion detection for scheduled delivery
-  - prd.json - Updated passes field for US-017
+  - src/booktok/delivery_scheduler.py - Added retry mechanism and _send_message_with_retry
+  - prd.json - Updated passes field for US-018
 - **Learnings for future iterations:**
-  - Use datetime.utcnow() for completed_at timestamp
-  - Check completion AFTER incrementing position, not before
-  - Completion message format includes book title and total snippets read
-  - Scheduled delivery uses send_message_func for congratulatory message
+  - Exponential backoff prevents API rate limiting during failures
+  - Log attempts at each failure level to diagnose issues
+  - DeliveryResult.attempts tracks total attempts made for delivery
+  - System remains operational - exceptions don't crash the delivery loop
 ---
 
 ## 2026-01-10 - US-002

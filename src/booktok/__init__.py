@@ -46,6 +46,16 @@ from booktok.delivery_scheduler import (
     UserNotFoundError,
     BookNotFoundError,
 )
+from booktok.input_validator import (
+    sanitize_text,
+    sanitize_filename,
+    validate_telegram_id,
+    validate_book_title,
+    validate_author,
+    sanitize_for_markdown,
+    validate_message_text,
+    ValidationError as InputValidationError,
+)
 
 
 def main() -> None:
@@ -68,6 +78,7 @@ __all__ = [
     "Frequency",
     "get_safe_content_length",
     "HELP_MESSAGE",
+    "InputValidationError",
     "InvalidFileError",
     "InvalidScheduleError",
     "InvalidTimezoneError",
@@ -75,6 +86,9 @@ __all__ = [
     "ProcessingResult",
     "ScheduleInfo",
     "SchedulerError",
+    "sanitize_filename",
+    "sanitize_for_markdown",
+    "sanitize_text",
     "Snippet",
     "SnippetFormatter",
     "SnippetGenerationError",
@@ -85,7 +99,11 @@ __all__ = [
     "User",
     "UserNotFoundError",
     "UserProgress",
+    "validate_book_title",
+    "validate_author",
     "validate_message_length",
+    "validate_message_text",
+    "validate_telegram_id",
     "ValidationError",
     "WELCOME_MESSAGE",
 ]
