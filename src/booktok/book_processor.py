@@ -18,7 +18,7 @@ from booktok.models import Book, BookStatus, FileType
 logger = logging.getLogger(__name__)
 
 # File size limits
-MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
+MAX_FILE_SIZE_BYTES = 400 * 1024 * 1024  # 400 MB
 MIN_FILE_SIZE_BYTES = 100  # 100 bytes (smaller files are likely invalid)
 
 # PDF magic bytes

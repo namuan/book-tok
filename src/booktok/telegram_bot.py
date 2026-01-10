@@ -304,7 +304,8 @@ class TelegramBotInterface:
 
             # Add button for this book
             button_text = f"{idx}. {book.display_name[:30]}"
-            callback_data = f"select_book:{book.filename}"
+            # Use index instead of filename to avoid callback_data 64 byte limit
+            callback_data = f"select_book:{idx}"
             keyboard.append(
                 [InlineKeyboardButton(button_text, callback_data=callback_data)]
             )
@@ -348,24 +349,31 @@ class TelegramBotInterface:
             )
             return
 
-        # Extract filename from callback data
+        # Extract index from callback data
         callback_data = query.data or ""
         if not callback_data.startswith("select_book:"):
             await query.edit_message_text("Invalid selection. Please try again.")
             return
 
-        filename = callback_data.replace("select_book:", "")
-
-        # Get the book file
-        book_file = self.book_scanner.get_book_by_name(filename)
-        if book_file is None:
+        try:
+            # We communicate via index to keep callback_data short
+            idx = int(callback_data.replace("select_book:", ""))
+        except ValueError:
             await query.edit_message_text(
-                f"\u274c *Book Not Found*\n\n"
-                f"The book `{filename}` could not be found.\n"
-                "Please use /books to see the current list.",
-                parse_mode="Markdown",
+                "Invalid book selection format. Please try /books again."
             )
             return
+
+        # Re-scan to resolve index to file
+        books = self.book_scanner.scan()
+        if idx < 1 or idx > len(books):
+            await query.edit_message_text(
+                "Book selection out of range. The book list may have changed.\n"
+                "Please use /books to see the current list."
+            )
+            return
+
+        book_file = books[idx - 1]
 
         # Show processing message
         await query.edit_message_text(
