@@ -1,12 +1,38 @@
 [project]
 name = "book-tok"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Telegram bot that delivers bite-sized learning snippets from PDF and EPUB books"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "python-telegram-bot>=21.0",
+    "PyPDF2>=3.0.0",
+    "EbookLib>=0.18",
+    "nltk>=3.8.0",
+    "hypothesis>=6.100.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.10.0",
+    "pytest>=8.0.0",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
 
 [tool.uv.workspace]
 members = [
     "booktok",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
 ]
