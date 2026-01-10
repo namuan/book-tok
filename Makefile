@@ -52,7 +52,7 @@ test-single: ## Run a single test file (usage: make test-single TEST=test_config
 
 run: ## Run the application
 	@echo "🚀 Running $(PROJECTNAME)"
-	@uv run python -m spy_sma_alert_bot.main
+	@uv run src/main.py
 
 deploy: clean ## Copies any changed file to the server
 	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}"'
