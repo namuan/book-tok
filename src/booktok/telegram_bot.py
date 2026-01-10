@@ -602,10 +602,21 @@ class TelegramBotInterface:
 
             start_page = snippets[0].position + 1
             end_page = snippets[-1].position + 1
-            await update.message.reply_text(
-                f"🤖 Generating summary for pages {start_page}-{end_page}...",
-                parse_mode="Markdown",
-            )
+            title_safe = sanitize_text_for_telegram(book.title)
+            status_msg = f"🤖 *{title_safe}* Generating summary for pages {start_page}-{end_page}..."
+            try:
+                await update.message.reply_text(
+                    status_msg,
+                    parse_mode="Markdown",
+                )
+            except BadRequest as e:
+                logger.warning(
+                    f"Failed to send status with Markdown: {e}. Retrying without formatting."
+                )
+                await update.message.reply_text(
+                    status_msg,
+                    parse_mode=None,
+                )
 
             summary = await self.ai_summarizer.summarize_snippets(
                 [s.content for s in snippets], previous_snippet
