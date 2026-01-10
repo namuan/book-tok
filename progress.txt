@@ -1,0 +1,23 @@
+## Codebase Patterns
+- Use `uv run mypy src/` to typecheck the project
+- All functions must have return type annotations for strict mypy
+- Database module is at `src/booktok/database.py` with `initialize_database()` function
+- Use `uv sync` and `uv add` for dependency management
+
+---
+
+## 2026-01-10 - US-001
+Thread: https://ampcode.com/threads/T-019ba8e3-1cce-72a9-877a-200b1a225c86
+- What was implemented:
+  - Updated pyproject.toml with all required dependencies
+  - Created SQLite database initialization script with full schema
+  - Fixed main.py to have proper type annotations
+- Files changed:
+  - pyproject.toml - Added dependencies and mypy config
+  - src/booktok/database.py - New file with database initialization
+  - src/main.py - Added return type annotation
+- **Learnings for future iterations:**
+  - Project uses strict mypy configuration - all functions need type annotations
+  - Database schema includes: users, books, snippets, user_progress, delivery_schedules
+  - Tables use INTEGER for booleans (is_completed, is_paused)
+---
