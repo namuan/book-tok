@@ -483,14 +483,12 @@ class TelegramBotInterface:
             )
 
             if existing_progress is not None:
-                # Reset progress to start from beginning
-                existing_progress.current_position = 0
-                existing_progress.is_completed = False
-                existing_progress.completed_at = None
+                # Resume progress - update will refresh the updated_at timestamp
+                # making this the active book
                 self.progress_repo.update(existing_progress)
                 progress = existing_progress
                 logger.info(
-                    f"Reset progress for user {telegram_id} on book '{book.title}'"
+                    f"Resumed progress for user {telegram_id} on book '{book.title}' at position {progress.current_position}"
                 )
             else:
                 # Create new progress
