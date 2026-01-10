@@ -5,6 +5,9 @@
 - Use `uv sync` and `uv add` for dependency management
 - Data models are in `src/booktok/models.py` with enums: BookStatus, FileType, Frequency
 - All dataclasses have `validate()` method and call it in `__post_init__()`
+- Repository pattern: use `DatabaseConnectionManager` from `src/booktok/repository.py`
+- Use `with db.transaction()` context manager for write operations (auto commit/rollback)
+- SQLite stores booleans as INTEGER (0/1) - convert when reading rows
 
 ---
 
@@ -38,4 +41,24 @@ Thread: https://ampcode.com/threads/T-019ba8e5-1636-73eb-a6be-37164bcce51c
   - ValidationError is a custom exception in models.py
   - delivery_time format is "HH:MM" (24-hour format)
   - Database IDs are Optional[int] since they're set by DB on insert
+---
+
+## 2026-01-10 - US-003
+Thread: https://ampcode.com/threads/T-019ba8e6-aecb-73e2-9e15-b9ec393af3c5
+- What was implemented:
+  - Created DatabaseConnectionManager with context manager for transactions
+  - Implemented UserRepository with full CRUD + get_by_telegram_id
+  - Implemented BookRepository with CRUD + list_by_status
+  - Implemented SnippetRepository with CRUD + bulk create, get_by_book_and_position
+  - Implemented UserProgressRepository with CRUD + get_by_user_and_book
+  - Implemented DeliveryScheduleRepository with CRUD + list_pending_deliveries
+  - Created MigrationManager for database version tracking
+- Files changed:
+  - src/booktok/repository.py - New file with all repositories
+- **Learnings for future iterations:**
+  - All repositories use DatabaseConnectionManager for shared connection handling
+  - Use `with db.transaction()` for write operations (auto commit/rollback)
+  - SQLite stores booleans as INTEGER (0/1) - convert in row_to_model methods
+  - datetime values stored as ISO format strings, parse with fromisoformat()
+  - MigrationManager tracks applied migrations in `migrations` table
 ---
