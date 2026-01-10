@@ -68,6 +68,16 @@ from booktok.database import (
     DatabaseIntegrityError,
     DatabaseCorruptedError,
 )
+from booktok.config import (
+    AppConfig,
+    DatabaseConfig,
+    TelegramConfig,
+    SchedulerConfig,
+    LoggingConfig,
+    load_config,
+    setup_logging,
+    validate_config,
+)
 
 
 def main() -> None:
@@ -75,6 +85,7 @@ def main() -> None:
 
 
 __all__ = [
+    "AppConfig",
     "AutomatedDeliveryRunner",
     "Book",
     "BookNotFoundError",
@@ -83,6 +94,7 @@ __all__ = [
     "BookStatus",
     "check_database_integrity",
     "close_database",
+    "DatabaseConfig",
     "DatabaseConnectionError",
     "DatabaseCorruptedError",
     "DatabaseError",
@@ -101,26 +113,33 @@ __all__ = [
     "InvalidFileError",
     "InvalidScheduleError",
     "InvalidTimezoneError",
+    "load_config",
+    "LoggingConfig",
     "main",
     "ProcessingResult",
     "recover_database",
     "ScheduleInfo",
+    "SchedulerConfig",
     "SchedulerError",
     "sanitize_filename",
     "sanitize_for_markdown",
     "sanitize_text",
+    "SchedulerConfig",
+    "setup_logging",
     "Snippet",
     "SnippetFormatter",
     "SnippetGenerationError",
     "SnippetGenerationResult",
     "SnippetGenerator",
     "TelegramBotInterface",
+    "TelegramConfig",
     "UnsupportedFileTypeError",
     "User",
     "UserNotFoundError",
     "UserProgress",
     "validate_author",
     "validate_book_title",
+    "validate_config",
     "validate_message_length",
     "validate_message_text",
     "validate_telegram_id",

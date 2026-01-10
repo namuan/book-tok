@@ -25,28 +25,27 @@
 
 ---
 
-## 2026-01-10 - US-019
-Thread: https://ampcode.com/threads/T-019ba90a-1c1e-72e7-9c3c-39c22c8e2f5c
+## 2026-01-10 - US-020
+Thread: https://ampcode.com/threads/T-019ba90b-1c3d-72ed-9c4c-39c22c9e2f5c
 - What was implemented:
-  - Created input_validator.py with comprehensive validation utilities
-  - Added sanitize_text() for HTML escaping and dangerous character removal
-  - Added sanitize_filename() for path traversal prevention
-  - Added validate_telegram_id() for Telegram ID validation
-  - Added validate_book_title() and validate_author() for content validation
-  - Added sanitize_for_markdown() for Telegram Markdown safety
-  - Added validate_message_text() for message length and content validation
+  - Enhanced database.py with comprehensive error handling
+  - Added DatabaseError, DatabaseConnectionError, DatabaseIntegrityError, DatabaseCorruptedError exceptions
+  - Added retry logic to initialize_database() with configurable max_retries
+  - Added check_database_integrity() for data consistency verification
+  - Added recover_database() for corruption recovery with backup creation
+  - Added PRAGMA settings for WAL mode and foreign key enforcement
   - All exports added to __init__.py and __all__
-  - Updated prd.json to mark US-019 as passes=true
+  - Updated prd.json to mark US-020 as passes=true
 - Files changed:
-  - src/booktok/input_validator.py - New file with validation utilities
-  - src/booktok/__init__.py - Added exports for validator functions
-  - prd.json - Updated passes field for US-019
+  - src/booktok/database.py - Added error handling, recovery, integrity checks
+  - src/booktok/__init__.py - Added exports for database functions
+  - prd.json - Updated passes field for US-020
 - **Learnings for future iterations:**
-  - Use html.escape() for basic HTML injection prevention
-  - Sanitize filenames to prevent path traversal (os.path.basename, check for dots)
-  - Validate Telegram IDs are positive integers within valid range
-  - Markdown escaping requires escaping special chars: _ * [ ] ( ) ~ ` > # + - = | { } . !
-  - Use ValidationError exception for consistent error handling
+  - Use PRAGMA journal_mode=WAL for better concurrency
+  - Use PRAGMA foreign_keys=ON for referential integrity
+  - WAL checkpoint and VACUUM can help recover corrupted databases
+  - Always backup before attempting recovery
+  - Log with exc_info=True for database errors to capture full context
 ---
 
 ## 2026-01-10 - US-002
