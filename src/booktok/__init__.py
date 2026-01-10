@@ -23,6 +23,13 @@ from booktok.snippet_generator import (
     SnippetGenerationError,
     SnippetGenerationResult,
 )
+from booktok.snippet_formatter import (
+    FormattedMessage,
+    FormattedSnippet,
+    SnippetFormatter,
+    validate_message_length,
+    get_safe_content_length,
+)
 
 
 def main() -> None:
@@ -36,10 +43,13 @@ __all__ = [
     "BookStatus",
     "DeliverySchedule",
     "FileType",
+    "FormattedMessage",
+    "FormattedSnippet",
     "Frequency",
     "InvalidFileError",
     "ProcessingResult",
     "Snippet",
+    "SnippetFormatter",
     "SnippetGenerationError",
     "SnippetGenerationResult",
     "SnippetGenerator",
@@ -47,5 +57,7 @@ __all__ = [
     "User",
     "UserProgress",
     "ValidationError",
+    "get_safe_content_length",
     "main",
+    "validate_message_length",
 ]
