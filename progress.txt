@@ -16,6 +16,9 @@
 - Snippet generation in `src/booktok/snippet_generator.py` with SnippetGenerator class
 - Use `generate_snippets_safely()` for safe snippet generation with error handling
 - Clear mypy cache with `rm -rf .mypy_cache` if pyproject.toml mypy config changes aren't picked up
+- Telegram bot interface is in `src/booktok/telegram_bot.py` with TelegramBotInterface class
+- Use Application.builder().token(token).build() for python-telegram-bot v20+
+- CommandHandler takes (command_name, handler_function) - command name without leading slash
 
 ---
 
@@ -173,4 +176,23 @@ Thread: https://ampcode.com/threads/T-019ba8f5-d61e-764e-addf-06966835de02
   - Split at paragraph boundaries first, then sentence boundaries, then word
   - Use emojis: 📚 for book title, ✍️ for author, 📖 for progress
   - Escape Markdown special chars: _ * [ ] ( ) ~ ` > # + - = | { } . !
+---
+
+## 2026-01-10 - US-009
+Thread: https://ampcode.com/threads/T-019ba8f8-a1cb-717e-8dbb-cd3aba72b0b0
+- What was implemented:
+  - Created TelegramBotInterface class with command routing using python-telegram-bot
+  - Implemented /start command with welcome message and user profile creation
+  - Implemented /help command listing available commands
+  - User profile created/updated on first interaction with telegram_id, username, names
+  - Updated __init__.py to export TelegramBotInterface
+- Files changed:
+  - src/booktok/telegram_bot.py - New file with bot interface and command handlers
+  - src/booktok/__init__.py - Added exports for TelegramBotInterface
+- **Learnings for future iterations:**
+  - Use Application.builder().token(token).build() for python-telegram-bot v20+
+  - CommandHandler takes (command_name, handler_function) - no leading slash
+  - Update objects have effective_user (TelegramUser) and message (Message)
+  - Use parse_mode="Markdown" for formatted messages with *bold* etc.
+  - For polling: initialize() -> start() -> updater.start_polling()
 ---
