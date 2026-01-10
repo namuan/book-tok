@@ -62,6 +62,7 @@ class OpenRouterConfig:
     model: str = "google/gemini-2.0-flash-001"
     site_url: str = "https://github.com/namuan/book-tok"
     app_name: str = "BookTok"
+    summary_page_count: int = 5
 
 
 @dataclass
@@ -93,6 +94,15 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     or_model = os.environ.get("OPENROUTER_PRIMARY_MODEL")
     if or_model:
         config.openrouter.model = or_model
+
+    summary_count = os.environ.get("BOOKTOK_SUMMARY_PAGE_COUNT")
+    if summary_count:
+        try:
+            config.openrouter.summary_page_count = int(summary_count)
+        except ValueError:
+            logger.warning(
+                f"Invalid BOOKTOK_SUMMARY_PAGE_COUNT value: {summary_count}, using default"
+            )
 
     database_path = os.environ.get("BOOKTOK_DB_PATH")
 

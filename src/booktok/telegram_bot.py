@@ -576,7 +576,7 @@ class TelegramBotInterface:
 
         if self.ai_summarizer:
             # AI Summarization Mode
-            target_count = 3
+            target_count = self.config.openrouter.summary_page_count
             snippets = self.snippet_repo.get_range_by_book(
                 active_progress.book_id,
                 next_position,
