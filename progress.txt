@@ -196,3 +196,20 @@ Thread: https://ampcode.com/threads/T-019ba8f8-a1cb-717e-8dbb-cd3aba72b0b0
   - Use parse_mode="Markdown" for formatted messages with *bold* etc.
   - For polling: initialize() -> start() -> updater.start_polling()
 ---
+
+## 2026-01-10 - US-010
+Thread: https://ampcode.com/threads/T-019ba8fb-877b-75d5-96b3-d0dc5d700c30
+- What was implemented:
+  - Added MessageHandler for unrecognized commands using filters.COMMAND
+  - Created UNRECOGNIZED_COMMAND_MESSAGE with list of valid commands
+  - Implemented _handle_unrecognized_command() for invalid commands
+  - Implemented _handle_text_message() for plain text (non-command) messages
+  - Added _get_suggestion_message() with common mistake detection (typos like "helps", "nexts")
+  - Suggestions provided for common words: begin->start, continue->next, menu->help, etc.
+- Files changed:
+  - src/booktok/telegram_bot.py - Added MessageHandler, filters imports; new handler methods
+- **Learnings for future iterations:**
+  - Use `filters.COMMAND & ~filters.Regex(r"^/(start|help|next)")` to catch unrecognized commands
+  - MessageHandler with `filters.TEXT & ~filters.COMMAND` catches plain text messages
+  - Telegram filter operators: `&` (and), `|` (or), `~` (not)
+---

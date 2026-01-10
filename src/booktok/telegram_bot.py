@@ -13,7 +13,14 @@ from telegram.ext import (
 )
 
 from booktok.models import User
-from booktok.repository import DatabaseConnectionManager, UserRepository
+from booktok.repository import (
+    BookRepository,
+    DatabaseConnectionManager,
+    SnippetRepository,
+    UserProgressRepository,
+    UserRepository,
+)
+from booktok.snippet_formatter import SnippetFormatter
 
 
 logger = logging.getLogger(__name__)
@@ -91,6 +98,9 @@ class TelegramBotInterface:
         self.token = token
         self.db_manager = db_manager
         self.user_repo = UserRepository(db_manager)
+        self.book_repo = BookRepository(db_manager)
+        self.snippet_repo = SnippetRepository(db_manager)
+        self.progress_repo = UserProgressRepository(db_manager)
         self.application: Optional[Application] = None  # type: ignore[type-arg]
 
     def build_application(self) -> Application:  # type: ignore[type-arg]
@@ -110,6 +120,7 @@ class TelegramBotInterface:
 
         self.application.add_handler(CommandHandler("start", self._handle_start))
         self.application.add_handler(CommandHandler("help", self._handle_help))
+        self.application.add_handler(CommandHandler("next", self._handle_next))
         
         self.application.add_handler(
             MessageHandler(
@@ -186,6 +197,87 @@ class TelegramBotInterface:
         await update.message.reply_text(
             HELP_MESSAGE,
             parse_mode="Markdown",
+        )
+
+    async def _handle_next(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle the /next command.
+
+        Delivers the next sequential snippet from the user's active book.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.effective_user is None or update.message is None:
+            return
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None:
+            await update.message.reply_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        if user.id is None:
+            await update.message.reply_text(
+                "An error occurred. Please try /start again.",
+            )
+            return
+
+        progress_list = self.progress_repo.list_by_user(user.id)
+        active_progress = None
+        for progress in progress_list:
+            if not progress.is_completed:
+                active_progress = progress
+                break
+
+        if active_progress is None:
+            await update.message.reply_text(
+                "📚 You don't have any active books.\n\n"
+                "Upload a PDF or EPUB to get started!",
+            )
+            return
+
+        book = self.book_repo.get_by_id(active_progress.book_id)
+        if book is None:
+            await update.message.reply_text(
+                "An error occurred finding your book. Please try again.",
+            )
+            return
+
+        total_snippets = self.snippet_repo.count_by_book(book.id or 0)
+        next_position = active_progress.current_position
+
+        snippet = self.snippet_repo.get_by_book_and_position(
+            active_progress.book_id, next_position
+        )
+
+        if snippet is None:
+            await update.message.reply_text(
+                f"📚 *{book.title}*\n\n"
+                "No more snippets available. You've reached the end!",
+                parse_mode="Markdown",
+            )
+            return
+
+        formatter = SnippetFormatter(book, total_snippets=total_snippets)
+        formatted = formatter.format_snippet(snippet, active_progress)
+
+        for message in formatted.messages:
+            await update.message.reply_text(
+                message.text,
+                parse_mode="Markdown",
+            )
+
+        logger.info(
+            f"Delivered snippet {next_position + 1}/{total_snippets} "
+            f"from book '{book.title}' to user {telegram_id}"
         )
 
     async def _handle_unrecognized_command(
