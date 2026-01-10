@@ -58,11 +58,12 @@ deploy: clean ## Copies any changed file to the server
 	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}"'
 	rsync -avzr \
 		.env \
+		books \
 		pyproject.toml \
 		uv.lock \
 		Makefile \
 		scripts \
-		spy_sma_alert_bot \
+		src \
 		${PROJECTNAME}:./${PROJECTNAME}
 
 start: deploy ## Sets up a screen session on the server and start the app

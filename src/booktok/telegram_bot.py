@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -610,10 +611,20 @@ class TelegramBotInterface:
                 [s.content for s in snippets], previous_snippet
             )
 
-            await update.message.reply_text(
-                sanitize_text_for_telegram(summary),
-                parse_mode="Markdown",
-            )
+            sanitized_summary = sanitize_text_for_telegram(summary)
+            try:
+                await update.message.reply_text(
+                    sanitized_summary,
+                    parse_mode="Markdown",
+                )
+            except BadRequest as e:
+                logger.warning(
+                    f"Failed to send summary with Markdown: {e}. Retrying without formatting."
+                )
+                await update.message.reply_text(
+                    sanitized_summary,
+                    parse_mode=None,
+                )
 
             # Advance logical position
             new_position = next_position + len(snippets)
@@ -646,10 +657,19 @@ class TelegramBotInterface:
             formatted = formatter.format_snippet(snippet, active_progress)
 
             for message in formatted.messages:
-                await update.message.reply_text(
-                    message.text,
-                    parse_mode="Markdown",
-                )
+                try:
+                    await update.message.reply_text(
+                        message.text,
+                        parse_mode="Markdown",
+                    )
+                except BadRequest as e:
+                    logger.warning(
+                        f"Failed to send snippet with Markdown: {e}. Retrying without formatting."
+                    )
+                    await update.message.reply_text(
+                        message.text,
+                        parse_mode=None,
+                    )
 
             active_progress.current_position = next_position + 1
 
