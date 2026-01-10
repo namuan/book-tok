@@ -8,6 +8,8 @@ from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
 
 from booktok.models import User
@@ -52,6 +54,26 @@ HELP_MESSAGE = """📖 *BookTok Commands*
 Need help? Just send me a message!"""
 
 
+UNRECOGNIZED_COMMAND_MESSAGE = """❓ *Unrecognized Command*
+
+I didn't understand that command.
+
+*Available commands:*
+/start - Start the bot and create your profile
+/help - Show all available commands
+/next - Get the next snippet immediately
+
+*Did you mean one of these?*
+• If you wanted to start: use /start
+• If you need help: use /help
+• To get the next snippet: use /next
+
+Tip: Commands always start with a forward slash (/)"""
+
+
+VALID_COMMANDS = ["start", "help", "next"]
+
+
 class TelegramBotInterface:
     """Interface for handling Telegram bot commands and interactions."""
 
@@ -88,6 +110,20 @@ class TelegramBotInterface:
 
         self.application.add_handler(CommandHandler("start", self._handle_start))
         self.application.add_handler(CommandHandler("help", self._handle_help))
+        
+        self.application.add_handler(
+            MessageHandler(
+                filters.COMMAND & ~filters.Regex(r"^/(start|help|next)"),
+                self._handle_unrecognized_command,
+            )
+        )
+        
+        self.application.add_handler(
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND,
+                self._handle_text_message,
+            )
+        )
 
     async def _handle_start(
         self,
@@ -151,6 +187,97 @@ class TelegramBotInterface:
             HELP_MESSAGE,
             parse_mode="Markdown",
         )
+
+    async def _handle_unrecognized_command(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle unrecognized commands.
+
+        Sends a helpful error message with list of valid commands.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.message is None:
+            return
+
+        text = update.message.text or ""
+        logger.info(f"Unrecognized command received: {text}")
+
+        response = self._get_suggestion_message(text)
+        await update.message.reply_text(
+            response,
+            parse_mode="Markdown",
+        )
+
+    async def _handle_text_message(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle plain text messages (not commands).
+
+        Provides helpful guidance for users who send plain text.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.message is None:
+            return
+
+        text = update.message.text or ""
+        logger.info(f"Plain text message received: {text[:50]}...")
+
+        response = """I can only respond to commands right now.
+
+Try /help to see the list of available commands!"""
+        await update.message.reply_text(response)
+
+    def _get_suggestion_message(self, user_input: str) -> str:
+        """Generate a helpful suggestion message based on user input.
+
+        Args:
+            user_input: The unrecognized command or text.
+
+        Returns:
+            A formatted message with suggestions.
+        """
+        user_input_lower = user_input.lower().strip()
+        
+        common_mistakes = {
+            "begin": "/start",
+            "starts": "/start",
+            "starting": "/start",
+            "hi": "/start",
+            "hello": "/start",
+            "hey": "/start",
+            "helps": "/help",
+            "helping": "/help",
+            "?": "/help",
+            "commands": "/help",
+            "menu": "/help",
+            "nexts": "/next",
+            "continue": "/next",
+            "more": "/next",
+            "read": "/next",
+            "snippet": "/next",
+        }
+        
+        for key, suggestion in common_mistakes.items():
+            if key in user_input_lower:
+                return f"""❓ *Did you mean {suggestion}?*
+
+Your message: `{user_input}`
+
+Try using *{suggestion}* instead.
+
+Use /help to see all available commands."""
+        
+        return UNRECOGNIZED_COMMAND_MESSAGE
 
     async def run_polling(self) -> None:
         """Start the bot in polling mode."""
