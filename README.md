@@ -2,6 +2,8 @@
 
 BookTok is a Telegram bot that delivers bite-sized learning snippets from PDF and EPUB books on a scheduled basis.
 
+![](docs/intro.png)
+
 ## Features
 
 - 📚 Process PDF/EPUB books into digestible snippets
