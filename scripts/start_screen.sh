@@ -8,7 +8,8 @@ SESSION_NAME=$1
 SESSION_CMD=$2
 
 # Kill existing session if it exists
-tmux kill-session -t "${SESSION_NAME}" 2>/dev/null
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${SCRIPT_DIR}/stop_screen.sh" "${SESSION_NAME}"
 
 # Create new session and run command
 tmux new-session -d -s "${SESSION_NAME}" "${SESSION_CMD}"
