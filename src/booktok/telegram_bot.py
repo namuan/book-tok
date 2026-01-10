@@ -593,8 +593,11 @@ class TelegramBotInterface:
                 if prev_obj:
                     previous_snippet = prev_obj.content
 
+            start_page = snippets[0].position + 1
+            end_page = snippets[-1].position + 1
             await update.message.reply_text(
-                "🤖 Generating summary for the next pages...", parse_mode="Markdown"
+                f"🤖 Generating summary for pages {start_page}-{end_page}...",
+                parse_mode="Markdown",
             )
 
             summary = await self.ai_summarizer.summarize_snippets(
@@ -607,7 +610,15 @@ class TelegramBotInterface:
             )
 
             # Advance logical position
-            active_progress.current_position = next_position + len(snippets)
+            new_position = next_position + len(snippets)
+            active_progress.current_position = new_position
+
+            # Show progress
+            progress_pct = (new_position / total_snippets) * 100
+            await update.message.reply_text(
+                f"📖 *Progress*: {new_position}/{total_snippets} ({progress_pct:.1f}%)",
+                parse_mode="Markdown",
+            )
 
         else:
             # Standard Mode (Single Snippet)
