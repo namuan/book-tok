@@ -281,3 +281,22 @@ Thread: https://ampcode.com/threads/T-019ba8fe-dcc9-7412-909a-8572e0046bc7
     - _update_schedule_after_delivery() sets last_delivered_at and calculates next_delivery_at
     - For TWICE_DAILY frequency, adds 12 hours (not next day)
   ---
+
+## 2026-01-10 - US-014
+Thread: https://ampcode.com/threads/T-019ba904-0e5b-726d-80a4-4d8cb590f979
+- What was implemented:
+  - Added pause_schedule(), resume_schedule(), pause_all_schedules(), resume_all_schedules() to DeliveryScheduler
+  - Added /pause command handler to TelegramBotInterface - pauses all user schedules
+  - Added /resume command handler to TelegramBotInterface - resumes all user schedules with recalculated next delivery
+  - Updated HELP_MESSAGE, UNRECOGNIZED_COMMAND_MESSAGE, and VALID_COMMANDS
+  - Added common mistake suggestions for pause/resume (stop, halt, unpause, restart)
+  - /next command already works regardless of schedule (does not check is_paused)
+- Files changed:
+  - src/booktok/delivery_scheduler.py - Added pause/resume methods
+  - src/booktok/telegram_bot.py - Added /pause and /resume commands
+- **Learnings for future iterations:**
+  - is_paused field is already in DeliverySchedule model and persisted in database
+  - list_pending_deliveries() already filters out paused schedules (WHERE is_paused = 0)
+  - When resuming, recalculate next_delivery_at based on user timezone
+  - /next command bypasses the schedule entirely - always delivers from current position
+---
