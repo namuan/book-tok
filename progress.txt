@@ -62,3 +62,21 @@ Thread: https://ampcode.com/threads/T-019ba8e6-aecb-73e2-9e15-b9ec393af3c5
   - datetime values stored as ISO format strings, parse with fromisoformat()
   - MigrationManager tracks applied migrations in `migrations` table
 ---
+
+## 2026-01-10 - US-004
+Thread: https://ampcode.com/threads/T-019ba8e9-8dfb-7368-93a9-69385ec26836
+- What was implemented:
+  - Created BookProcessor class with PDF text extraction using PyPDF2
+  - Implemented multi-page PDF handling with page-by-page extraction
+  - Text cleaning/normalization (whitespace, line breaks, hyphenation fix)
+  - Custom exceptions: BookProcessingError, InvalidFileError, UnsupportedFileTypeError
+  - Updated __init__.py to export new classes
+- Files changed:
+  - src/booktok/book_processor.py - New file with PDF extraction logic
+  - src/booktok/__init__.py - Added exports for book processor classes
+- **Learnings for future iterations:**
+  - PyPDF2 uses PdfReader class (not PdfFileReader in v3+)
+  - PdfReadError is in PyPDF2.errors module
+  - Image-based PDFs won't yield text - need to detect and report this
+  - Hyphenation across lines is handled by regex: r"(\w)-\s*\n\s*(\w)" -> r"\1\2"
+---
