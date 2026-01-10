@@ -30,6 +30,11 @@ from booktok.snippet_formatter import (
     validate_message_length,
     get_safe_content_length,
 )
+from booktok.telegram_bot import (
+    TelegramBotInterface,
+    WELCOME_MESSAGE,
+    HELP_MESSAGE,
+)
 
 
 def main() -> None:
@@ -58,6 +63,9 @@ __all__ = [
     "UserProgress",
     "ValidationError",
     "get_safe_content_length",
+    "HELP_MESSAGE",
     "main",
+    "TelegramBotInterface",
     "validate_message_length",
+    "WELCOME_MESSAGE",
 ]
