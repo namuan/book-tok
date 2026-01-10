@@ -25,20 +25,24 @@
 
 ---
 
-## 2026-01-10 - US-001
-Thread: https://ampcode.com/threads/T-019ba8e3-1cce-72a9-877a-200b1a225c86
+## 2026-01-10 - US-017
+Thread: https://ampcode.com/threads/T-019ba908-1c5e-72e9-8c8c-39c07c7cb2ed
 - What was implemented:
-  - Updated pyproject.toml with all required dependencies
-  - Created SQLite database initialization script with full schema
-  - Fixed main.py to have proper type annotations
+  - Added book completion detection in _handle_next (telegram_bot.py)
+  - Added book completion detection in _deliver_snippet (delivery_scheduler.py)
+  - Completion detected when current_position >= total_snippets
+  - is_completed set to True and completed_at timestamp set on completion
+  - Congratulatory message sent to user on book completion
+  - Updated prd.json to mark US-017 as passes=true
 - Files changed:
-  - pyproject.toml - Added dependencies and mypy config
-  - src/booktok/database.py - New file with database initialization
-  - src/main.py - Added return type annotation
+  - src/booktok/telegram_bot.py - Added completion detection and congratulatory message
+  - src/booktok/delivery_scheduler.py - Added completion detection for scheduled delivery
+  - prd.json - Updated passes field for US-017
 - **Learnings for future iterations:**
-  - Project uses strict mypy configuration - all functions need type annotations
-  - Database schema includes: users, books, snippets, user_progress, delivery_schedules
-  - Tables use INTEGER for booleans (is_completed, is_paused)
+  - Use datetime.utcnow() for completed_at timestamp
+  - Check completion AFTER incrementing position, not before
+  - Completion message format includes book title and total snippets read
+  - Scheduled delivery uses send_message_func for congratulatory message
 ---
 
 ## 2026-01-10 - US-002

@@ -527,6 +527,7 @@ class DeliveryResult:
     message: str
     snippet_position: Optional[int] = None
     error: Optional[str] = None
+    attempts: int = 1
 
 
 SendMessageFunc = Callable[[int, str], "asyncio.Future[bool]"]
@@ -534,6 +535,11 @@ SendMessageFunc = Callable[[int, str], "asyncio.Future[bool]"]
 
 class AutomatedDeliveryRunner:
     """Handles automated scheduled delivery of book snippets."""
+
+    MAX_RETRIES = 5
+    INITIAL_BACKOFF_SECONDS = 1.0
+    MAX_BACKOFF_SECONDS = 30.0
+    BACKOFF_MULTIPLIER = 2.0
 
     def __init__(
         self,
@@ -593,6 +599,56 @@ class AutomatedDeliveryRunner:
             True if running, False otherwise.
         """
         return self._running
+
+    async def _send_message_with_retry(
+        self,
+        telegram_id: int,
+        message: str,
+    ) -> tuple[bool, int, str]:
+        """Send a message with exponential backoff retries.
+
+        Args:
+            telegram_id: The Telegram user ID to send to.
+            message: The message text to send.
+
+        Returns:
+            Tuple of (success, attempt_count, error_message).
+            success is True if message was sent successfully.
+            attempt_count is the number of attempts made.
+            error_message is empty if successful, contains error info if failed.
+        """
+        last_error = ""
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                result = await self.send_message_func(telegram_id, message)
+                if result:
+                    logger.info(
+                        f"Message sent to user {telegram_id} on attempt {attempt}"
+                    )
+                    return (True, attempt, "")
+                else:
+                    last_error = "send_message_func returned False"
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                last_error = str(e)
+
+            if attempt < self.MAX_RETRIES:
+                backoff_time = min(
+                    self.INITIAL_BACKOFF_SECONDS
+                    * (self.BACKOFF_MULTIPLIER ** (attempt - 1)),
+                    self.MAX_BACKOFF_SECONDS,
+                )
+                logger.warning(
+                    f"Attempt {attempt}/{self.MAX_RETRIES} failed for user {telegram_id}: {last_error}. "
+                    f"Retrying in {backoff_time:.1f}s"
+                )
+                await asyncio.sleep(backoff_time)
+
+        logger.error(
+            f"All {self.MAX_RETRIES} attempts failed for user {telegram_id}: {last_error}"
+        )
+        return (False, self.MAX_RETRIES, last_error)
 
     async def _run_loop(self) -> None:
         """Main loop that periodically checks for pending deliveries."""
@@ -726,15 +782,18 @@ class AutomatedDeliveryRunner:
         formatted = formatter.format_snippet(snippet, progress)
 
         all_sent = True
+        total_attempts = 0
         for message in formatted.messages:
-            try:
-                success = await self.send_message_func(user.telegram_id, message.text)
-                if not success:
-                    all_sent = False
-                    break
-            except Exception as e:
-                logger.error(f"Failed to send message to {user.telegram_id}: {e}")
+            success, attempts, error = await self._send_message_with_retry(
+                user.telegram_id, message.text
+            )
+            total_attempts += attempts
+            if not success:
                 all_sent = False
+                logger.error(
+                    f"Failed to deliver message to user {user.telegram_id} "
+                    f"after {attempts} attempts: {error}"
+                )
                 break
 
         if all_sent:
@@ -750,11 +809,12 @@ class AutomatedDeliveryRunner:
                     f"📚 Total snippets read: {total_snippets}\n\n"
                     f"Great job on finishing this book! 🏆"
                 )
-                try:
-                    await self.send_message_func(user.telegram_id, congratulatory)
-                except Exception as e:
+                success, attempts, error = await self._send_message_with_retry(
+                    user.telegram_id, congratulatory
+                )
+                if not success:
                     logger.error(
-                        f"Failed to send completion message to {user.telegram_id}: {e}"
+                        f"Failed to send completion message to user {user.telegram_id}: {error}"
                     )
 
             self.progress_repo.update(progress)
@@ -766,6 +826,7 @@ class AutomatedDeliveryRunner:
                 success=True,
                 message="Snippet delivered successfully",
                 snippet_position=progress.current_position - 1,
+                attempts=total_attempts,
             )
         else:
             return DeliveryResult(
@@ -774,7 +835,8 @@ class AutomatedDeliveryRunner:
                 book_id=schedule.book_id,
                 success=False,
                 message="Failed to send message via Telegram",
-                error="Telegram message delivery failed",
+                error=f"Telegram message delivery failed after {total_attempts} attempts",
+                attempts=total_attempts,
             )
 
     def _update_schedule_after_delivery(self, schedule: DeliverySchedule) -> None:
