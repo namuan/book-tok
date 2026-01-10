@@ -1,0 +1,349 @@
+{
+  "project": "Telegram Book Learning Bot",
+  "branchName": "ralph/telegram-book-bot",
+  "description": "A system that delivers bite-sized learning snippets automatically extracted from PDF and EPUB books through Telegram, enabling microlearning with scheduled delivery and progress tracking.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Set up project structure and dependencies",
+      "description": "As a developer, I need to establish the project foundation with Python structure, dependency management, and core libraries.",
+      "acceptanceCriteria": [
+        "Python project structure created with main application file",
+        "uv configured for dependency management with pyproject.toml",
+        "Core dependencies installed: python-telegram-bot, PyPDF2, EbookLib, NLTK, hypothesis",
+        "SQLite database initialization script created",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create data model classes for books, users, and snippets",
+      "description": "As a developer, I need to define the core data models that represent Users, Books, Snippets, UserProgress, and DeliverySchedule.",
+      "acceptanceCriteria": [
+        "Define User, Book, Snippet, UserProgress, and DeliverySchedule dataclasses with type hints",
+        "Implement validation methods for each model",
+        "All models have proper Python type annotations",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Implement database connection and CRUD operations",
+      "description": "As a developer, I need to set up SQLite database connectivity and implement the repository pattern for all data models.",
+      "acceptanceCriteria": [
+        "SQLite database connection manager implemented",
+        "Repository pattern implemented for User, Book, Snippet, UserProgress, and DeliverySchedule",
+        "Database schema creation working",
+        "CRUD operations (create, read, update, delete) functional for all models",
+        "Database migration support implemented",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Implement PDF text extraction",
+      "description": "As a user, I want PDF books to be processed so text can be extracted and converted into learning snippets.",
+      "acceptanceCriteria": [
+        "BookProcessor class created with PDF text extraction using PyPDF2",
+        "Text extraction handles multi-page PDFs",
+        "Text is cleaned and normalized",
+        "Invalid PDFs are caught and raise appropriate exceptions",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Implement EPUB text extraction",
+      "description": "As a user, I want EPUB books to be processed so text can be extracted and converted into learning snippets.",
+      "acceptanceCriteria": [
+        "BookProcessor class extended with EPUB text extraction using EbookLib",
+        "Text extraction from EPUB documents works correctly",
+        "Text is cleaned and normalized consistently with PDF extraction",
+        "Invalid EPUBs are caught and raise appropriate exceptions",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Implement book processing error handling",
+      "description": "As a system, I need to handle corrupted or invalid book files gracefully.",
+      "acceptanceCriteria": [
+        "File validation occurs before processing",
+        "Errors are logged with details",
+        "Book status is marked as failed for corrupted files",
+        "Appropriate error messages returned to users",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Implement snippet generation from extracted text",
+      "description": "As a developer, I need to split extracted book text into sequential 1-2 paragraph snippets.",
+      "acceptanceCriteria": [
+        "SnippetGenerator class created with NLTK integration",
+        "Paragraph boundary detection working",
+        "Snippets are extracted as 1-2 paragraph chunks",
+        "Sequential position markers assigned to each snippet",
+        "Snippets stored with position metadata",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Implement snippet formatting and message validation",
+      "description": "As a developer, I need to ensure snippets are properly formatted and comply with Telegram message length limits.",
+      "acceptanceCriteria": [
+        "Snippet text formatted with proper paragraph breaks and spacing",
+        "Message length validated against Telegram limits (4096 chars per message)",
+        "Long snippets split across multiple messages if needed",
+        "Formatting includes book title, author, and progress indicators",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Implement Telegram bot command handlers",
+      "description": "As a user, I want to interact with the bot through simple commands to start using the system.",
+      "acceptanceCriteria": [
+        "TelegramBotInterface class created with command routing",
+        "/start command handler with welcome message implemented",
+        "/help command handler with command list implemented",
+        "User profile created and stored on first interaction",
+        "User Telegram ID captured and persisted",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Implement error handling for unrecognized commands",
+      "description": "As a user, I want helpful error messages when I send invalid commands.",
+      "acceptanceCriteria": [
+        "Fallback handler catches unrecognized commands",
+        "Error message includes list of valid commands",
+        "Helpful suggestions provided for common mistakes",
+        "Response time under 3 seconds",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement snippet delivery with metadata",
+      "description": "As a user, I want to receive book snippets with context about the book and my progress.",
+      "acceptanceCriteria": [
+        "Snippet messages include book title and author",
+        "Current progress shown (e.g., '5/100 snippets')",
+        "Message formatted with proper paragraph breaks",
+        "Snippet content respects Telegram message length limits",
+        "/next command delivers next sequential snippet",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement delivery schedule storage",
+      "description": "As a user, I want to set a delivery schedule for when I receive snippets.",
+      "acceptanceCriteria": [
+        "DeliveryScheduler class created",
+        "User can set preferred delivery time and frequency",
+        "Schedule stored in database",
+        "Timezone preference stored for each user",
+        "Schedule can be retrieved and displayed to user",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Implement automated scheduled delivery",
+      "description": "As a system, I need to automatically send snippets at scheduled times.",
+      "acceptanceCriteria": [
+        "Background task checks for pending deliveries periodically",
+        "Scheduled delivery executes at correct time",
+        "User timezone respected for delivery timing",
+        "Message sent to Telegram API via python-telegram-bot",
+        "System continues running and checking schedules",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Implement schedule pause and immediate delivery",
+      "description": "As a user, I want to pause automatic deliveries and request snippets immediately when needed.",
+      "acceptanceCriteria": [
+        "/next command delivers next snippet regardless of schedule",
+        "Schedule pause stops automatic deliveries until resumed",
+        "/resume command re-enables automatic delivery",
+        "Paused state persisted in database",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Implement progress tracking and updates",
+      "description": "As a system, I need to track where each user is in each book.",
+      "acceptanceCriteria": [
+        "Progress updated when snippet delivered",
+        "Progress stored with book ID and snippet position",
+        "Current snippet position retrievable",
+        "Progress persisted to database on every update",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement progress initialization for new books",
+      "description": "As a system, I need to initialize progress when a user starts a new book.",
+      "acceptanceCriteria": [
+        "UserProgress record created when book assigned to user",
+        "Initial position set to 0 (before first snippet)",
+        "Book completion status set to false",
+        "Progress record linked to user and book",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement progress resumption and completion",
+      "description": "As a user, I want to resume from where I left off and be notified when books are completed.",
+      "acceptanceCriteria": [
+        "User resume returns to last stored progress position",
+        "Delivery continues from last snippet plus one",
+        "Book completion detected when all snippets delivered",
+        "Congratulatory message sent on completion",
+        "Book marked as completed in database",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Implement Telegram API error handling",
+      "description": "As a system, I need to handle Telegram API failures gracefully.",
+      "acceptanceCriteria": [
+        "Connection failures caught and logged",
+        "Exponential backoff implemented for retries",
+        "Message delivery retried up to 5 times",
+        "Failed deliveries logged for administrator review",
+        "System remains operational during transient failures",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Implement input validation and security",
+      "description": "As a system, I need to validate all user inputs to prevent vulnerabilities.",
+      "acceptanceCriteria": [
+        "All user inputs sanitized before database storage",
+        "File uploads validated for type and size",
+        "Telegram IDs validated as valid integers",
+        "Text inputs checked for length and invalid characters",
+        "Security validation prevents injection attacks",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Implement database error handling and recovery",
+      "description": "As a system, I need to handle database failures and maintain data consistency.",
+      "acceptanceCriteria": [
+        "Database connection failures caught and retried",
+        "Transaction rollback on errors",
+        "Data consistency checks implemented",
+        "Corrupted data recovery mechanisms in place",
+        "Database errors logged with full context",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Create main application entry point and configuration",
+      "description": "As a developer, I need to integrate all components into a single working application.",
+      "acceptanceCriteria": [
+        "Main application entry point created",
+        "All components (bot, database, scheduler) initialized together",
+        "Configuration loaded from file and environment variables",
+        "Logging configuration implemented",
+        "Application starts without errors",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement application startup and shutdown procedures",
+      "description": "As a system, I need to properly initialize resources on startup and clean up on shutdown.",
+      "acceptanceCriteria": [
+        "Database initialized on startup",
+        "Telegram bot connected and authenticated",
+        "Background scheduler started",
+        "Graceful shutdown implemented",
+        "All resources properly closed",
+        "No hanging processes after shutdown",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
