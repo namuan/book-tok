@@ -55,6 +55,16 @@ class BooksConfig:
 
 
 @dataclass
+class OpenRouterConfig:
+    """OpenRouter API configuration settings."""
+
+    api_key: Optional[str] = None
+    model: str = "google/gemini-2.0-flash-001"
+    site_url: str = "https://github.com/namuan/book-tok"
+    app_name: str = "BookTok"
+
+
+@dataclass
 class AppConfig:
     """Main application configuration."""
 
@@ -63,6 +73,7 @@ class AppConfig:
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     books: BooksConfig = field(default_factory=BooksConfig)
+    openrouter: OpenRouterConfig = field(default_factory=OpenRouterConfig)
 
 
 def load_config(config_path: Optional[str] = None) -> AppConfig:
@@ -77,7 +88,14 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     load_dotenv()
     config = AppConfig()
 
+    # OpenRouter
+    config.openrouter.api_key = os.environ.get("OPENROUTER_API_KEY")
+    or_model = os.environ.get("OPENROUTER_PRIMARY_MODEL")
+    if or_model:
+        config.openrouter.model = or_model
+
     database_path = os.environ.get("BOOKTOK_DB_PATH")
+
     if database_path:
         config.database.path = os.path.expanduser(database_path)
 

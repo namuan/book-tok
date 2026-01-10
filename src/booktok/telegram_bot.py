@@ -16,7 +16,7 @@ from telegram.ext import (
 
 from booktok.book_processor import BookProcessor
 from booktok.book_scanner import BookScanner
-from booktok.config import BooksConfig
+from booktok.config import AppConfig
 from booktok.delivery_scheduler import DeliveryScheduler
 from booktok.models import Book, BookStatus, User, UserProgress
 from booktok.snippet_generator import SnippetGenerator
@@ -29,6 +29,7 @@ from booktok.repository import (
     UserRepository,
 )
 from booktok.snippet_formatter import SnippetFormatter
+from booktok.ai_summarizer import AISummarizer
 
 
 logger = logging.getLogger(__name__)
@@ -117,19 +118,20 @@ class TelegramBotInterface:
         self,
         token: str,
         db_manager: DatabaseConnectionManager,
-        books_config: BooksConfig,
+        config: AppConfig,
     ) -> None:
         """Initialize the Telegram bot interface.
 
         Args:
             token: Telegram bot API token.
             db_manager: Database connection manager.
-            books_config: Books directory configuration.
+            config: Application configuration.
         """
         self.token = token
         self.db_manager = db_manager
-        self.books_config = books_config
-        self.book_scanner = BookScanner(books_config.directory)
+        self.config = config
+        self.books_config = config.books
+        self.book_scanner = BookScanner(config.books.directory)
         self.user_repo = UserRepository(db_manager)
         self.book_repo = BookRepository(db_manager)
         self.snippet_repo = SnippetRepository(db_manager)
@@ -137,6 +139,11 @@ class TelegramBotInterface:
         self.schedule_repo = DeliveryScheduleRepository(db_manager)
         self.scheduler = DeliveryScheduler(db_manager)
         self.application: Optional[Application] = None  # type: ignore[type-arg]
+
+        self.ai_summarizer: Optional[AISummarizer] = None
+        if config.openrouter.api_key:
+            self.ai_summarizer = AISummarizer(config.openrouter)
+            logger.info("AI Summarizer initialized with OpenRouter")
 
     def build_application(self) -> Application:  # type: ignore[type-arg]
         """Build and configure the Telegram application.
@@ -559,29 +566,74 @@ class TelegramBotInterface:
         total_snippets = self.snippet_repo.count_by_book(book.id or 0)
         next_position = active_progress.current_position
 
-        snippet = self.snippet_repo.get_by_book_and_position(
-            active_progress.book_id, next_position
-        )
-
-        if snippet is None:
-            title_safe = sanitize_text_for_telegram(book.title)
-            await update.message.reply_text(
-                f"📚 *{title_safe}*\n\n"
-                "No more snippets available. You've reached the end!",
-                parse_mode="Markdown",
-            )
-            return
-
-        formatter = SnippetFormatter(book, total_snippets=total_snippets)
-        formatted = formatter.format_snippet(snippet, active_progress)
-
-        for message in formatted.messages:
-            await update.message.reply_text(
-                message.text,
-                parse_mode="Markdown",
+        if self.ai_summarizer:
+            # AI Summarization Mode
+            target_count = 3
+            snippets = self.snippet_repo.get_range_by_book(
+                active_progress.book_id,
+                next_position,
+                next_position + target_count - 1,
             )
 
-        active_progress.current_position = next_position + 1
+            if not snippets:
+                title_safe = sanitize_text_for_telegram(book.title)
+                await update.message.reply_text(
+                    f"📚 *{title_safe}*\n\n"
+                    "No more snippets available. You've reached the end!",
+                    parse_mode="Markdown",
+                )
+                return
+
+            # Fetch previous context if available
+            previous_snippet = None
+            if next_position > 0:
+                prev_obj = self.snippet_repo.get_by_book_and_position(
+                    active_progress.book_id, next_position - 1
+                )
+                if prev_obj:
+                    previous_snippet = prev_obj.content
+
+            await update.message.reply_text(
+                "🤖 Generating summary for the next pages...", parse_mode="Markdown"
+            )
+
+            summary = await self.ai_summarizer.summarize_snippets(
+                [s.content for s in snippets], previous_snippet
+            )
+
+            await update.message.reply_text(
+                sanitize_text_for_telegram(summary),
+                parse_mode="Markdown",
+            )
+
+            # Advance logical position
+            active_progress.current_position = next_position + len(snippets)
+
+        else:
+            # Standard Mode (Single Snippet)
+            snippet = self.snippet_repo.get_by_book_and_position(
+                active_progress.book_id, next_position
+            )
+
+            if snippet is None:
+                title_safe = sanitize_text_for_telegram(book.title)
+                await update.message.reply_text(
+                    f"📚 *{title_safe}*\n\n"
+                    "No more snippets available. You've reached the end!",
+                    parse_mode="Markdown",
+                )
+                return
+
+            formatter = SnippetFormatter(book, total_snippets=total_snippets)
+            formatted = formatter.format_snippet(snippet, active_progress)
+
+            for message in formatted.messages:
+                await update.message.reply_text(
+                    message.text,
+                    parse_mode="Markdown",
+                )
+
+            active_progress.current_position = next_position + 1
 
         if active_progress.current_position >= total_snippets:
             active_progress.is_completed = True

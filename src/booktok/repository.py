@@ -495,6 +495,30 @@ class SnippetRepository:
         row = cursor.fetchone()
         return self._row_to_snippet(row) if row else None
 
+    def get_range_by_book(
+        self, book_id: int, start_position: int, end_position: int
+    ) -> list[Snippet]:
+        """Retrieve a range of snippets for a book.
+
+        Args:
+            book_id: Database ID of the book.
+            start_position: Starting position (inclusive).
+            end_position: Ending position (inclusive).
+
+        Returns:
+            List of snippets ordered by position.
+        """
+        conn = self.db.get_connection()
+        cursor = conn.execute(
+            """
+            SELECT * FROM snippets
+            WHERE book_id = ? AND position >= ? AND position <= ?
+            ORDER BY position ASC
+            """,
+            (book_id, start_position, end_position),
+        )
+        return [self._row_to_snippet(row) for row in cursor.fetchall()]
+
     def list_by_book(self, book_id: int) -> list[Snippet]:
         """Retrieve all snippets for a book.
 
