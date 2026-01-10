@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 from booktok.delivery_scheduler import DeliveryScheduler
-from booktok.models import User
+from booktok.models import User, UserProgress
 from booktok.repository import (
     BookRepository,
     DatabaseConnectionManager,
@@ -133,14 +133,14 @@ class TelegramBotInterface:
         self.application.add_handler(CommandHandler("next", self._handle_next))
         self.application.add_handler(CommandHandler("pause", self._handle_pause))
         self.application.add_handler(CommandHandler("resume", self._handle_resume))
-        
+
         self.application.add_handler(
             MessageHandler(
                 filters.COMMAND & ~filters.Regex(r"^/(start|help|next|pause|resume)"),
                 self._handle_unrecognized_command,
             )
         )
-        
+
         self.application.add_handler(
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND,
@@ -472,7 +472,7 @@ Try /help to see the list of available commands!"""
             A formatted message with suggestions.
         """
         user_input_lower = user_input.lower().strip()
-        
+
         common_mistakes = {
             "begin": "/start",
             "starts": "/start",
@@ -497,7 +497,7 @@ Try /help to see the list of available commands!"""
             "restart": "/resume",
             "resumed": "/resume",
         }
-        
+
         for key, suggestion in common_mistakes.items():
             if key in user_input_lower:
                 return f"""❓ *Did you mean {suggestion}?*
@@ -507,7 +507,7 @@ Your message: `{user_input}`
 Try using *{suggestion}* instead.
 
 Use /help to see all available commands."""
-        
+
         return UNRECOGNIZED_COMMAND_MESSAGE
 
     async def run_polling(self) -> None:
@@ -528,3 +528,15 @@ Use /help to see all available commands."""
             UserRepository instance.
         """
         return self.user_repo
+
+    def start_book(self, user_id: int, book_id: int) -> UserProgress:
+        """Initialize progress for a user on a book.
+
+        Args:
+            user_id: Database ID of the user.
+            book_id: Database ID of the book.
+
+        Returns:
+            UserProgress record for the user's progress on the book.
+        """
+        return self.progress_repo.initialize_progress(user_id, book_id)

@@ -107,7 +107,13 @@ class UserRepository:
                 INSERT INTO users (telegram_id, username, first_name, last_name, timezone)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (user.telegram_id, user.username, user.first_name, user.last_name, user.timezone),
+                (
+                    user.telegram_id,
+                    user.username,
+                    user.first_name,
+                    user.last_name,
+                    user.timezone,
+                ),
             )
             user.id = cursor.lastrowid
         return user
@@ -136,7 +142,9 @@ class UserRepository:
             User if found, None otherwise.
         """
         conn = self.db.get_connection()
-        cursor = conn.execute("SELECT * FROM users WHERE telegram_id = ?", (telegram_id,))
+        cursor = conn.execute(
+            "SELECT * FROM users WHERE telegram_id = ?", (telegram_id,)
+        )
         row = cursor.fetchone()
         return self._row_to_user(row) if row else None
 
@@ -161,7 +169,13 @@ class UserRepository:
                 SET username = ?, first_name = ?, last_name = ?, timezone = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (user.username, user.first_name, user.last_name, user.timezone, user.id),
+                (
+                    user.username,
+                    user.first_name,
+                    user.last_name,
+                    user.timezone,
+                    user.id,
+                ),
             )
         return user
 
@@ -447,7 +461,9 @@ class SnippetRepository:
         row = cursor.fetchone()
         return self._row_to_snippet(row) if row else None
 
-    def get_by_book_and_position(self, book_id: int, position: int) -> Optional[Snippet]:
+    def get_by_book_and_position(
+        self, book_id: int, position: int
+    ) -> Optional[Snippet]:
         """Retrieve a snippet by book ID and position.
 
         Args:
@@ -621,11 +637,15 @@ class UserProgressRepository:
             UserProgress if found, None otherwise.
         """
         conn = self.db.get_connection()
-        cursor = conn.execute("SELECT * FROM user_progress WHERE id = ?", (progress_id,))
+        cursor = conn.execute(
+            "SELECT * FROM user_progress WHERE id = ?", (progress_id,)
+        )
         row = cursor.fetchone()
         return self._row_to_progress(row) if row else None
 
-    def get_by_user_and_book(self, user_id: int, book_id: int) -> Optional[UserProgress]:
+    def get_by_user_and_book(
+        self, user_id: int, book_id: int
+    ) -> Optional[UserProgress]:
         """Retrieve progress for a specific user and book.
 
         Args:
@@ -674,7 +694,9 @@ class UserProgressRepository:
         if progress.id is None:
             raise ValueError("Cannot update progress without ID")
         with self.db.transaction() as conn:
-            completed_at = progress.completed_at.isoformat() if progress.completed_at else None
+            completed_at = (
+                progress.completed_at.isoformat() if progress.completed_at else None
+            )
             conn.execute(
                 """
                 UPDATE user_progress
@@ -700,7 +722,9 @@ class UserProgressRepository:
             True if record was deleted, False if not found.
         """
         with self.db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM user_progress WHERE id = ?", (progress_id,))
+            cursor = conn.execute(
+                "DELETE FROM user_progress WHERE id = ?", (progress_id,)
+            )
             return cursor.rowcount > 0
 
     def _row_to_progress(self, row: sqlite3.Row) -> UserProgress:
@@ -732,6 +756,28 @@ class UserProgressRepository:
         except (ValueError, AttributeError):
             return None
 
+    def initialize_progress(self, user_id: int, book_id: int) -> UserProgress:
+        """Initialize progress for a user on a book if not already exists.
+
+        Args:
+            user_id: Database ID of the user.
+            book_id: Database ID of the book.
+
+        Returns:
+            UserProgress record (existing or newly created).
+        """
+        existing = self.get_by_user_and_book(user_id, book_id)
+        if existing is not None:
+            return existing
+
+        progress = UserProgress(
+            user_id=user_id,
+            book_id=book_id,
+            current_position=0,
+            is_completed=False,
+        )
+        return self.create(progress)
+
 
 class DeliveryScheduleRepository:
     """Repository for DeliverySchedule CRUD operations."""
@@ -754,7 +800,11 @@ class DeliveryScheduleRepository:
             DeliverySchedule with assigned ID.
         """
         with self.db.transaction() as conn:
-            next_delivery = schedule.next_delivery_at.isoformat() if schedule.next_delivery_at else None
+            next_delivery = (
+                schedule.next_delivery_at.isoformat()
+                if schedule.next_delivery_at
+                else None
+            )
             cursor = conn.execute(
                 """
                 INSERT INTO delivery_schedules
@@ -783,11 +833,15 @@ class DeliveryScheduleRepository:
             DeliverySchedule if found, None otherwise.
         """
         conn = self.db.get_connection()
-        cursor = conn.execute("SELECT * FROM delivery_schedules WHERE id = ?", (schedule_id,))
+        cursor = conn.execute(
+            "SELECT * FROM delivery_schedules WHERE id = ?", (schedule_id,)
+        )
         row = cursor.fetchone()
         return self._row_to_schedule(row) if row else None
 
-    def get_by_user_and_book(self, user_id: int, book_id: int) -> Optional[DeliverySchedule]:
+    def get_by_user_and_book(
+        self, user_id: int, book_id: int
+    ) -> Optional[DeliverySchedule]:
         """Retrieve schedule for a specific user and book.
 
         Args:
@@ -856,8 +910,16 @@ class DeliveryScheduleRepository:
         if schedule.id is None:
             raise ValueError("Cannot update schedule without ID")
         with self.db.transaction() as conn:
-            last_delivered = schedule.last_delivered_at.isoformat() if schedule.last_delivered_at else None
-            next_delivery = schedule.next_delivery_at.isoformat() if schedule.next_delivery_at else None
+            last_delivered = (
+                schedule.last_delivered_at.isoformat()
+                if schedule.last_delivered_at
+                else None
+            )
+            next_delivery = (
+                schedule.next_delivery_at.isoformat()
+                if schedule.next_delivery_at
+                else None
+            )
             conn.execute(
                 """
                 UPDATE delivery_schedules
@@ -886,7 +948,9 @@ class DeliveryScheduleRepository:
             True if schedule was deleted, False if not found.
         """
         with self.db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM delivery_schedules WHERE id = ?", (schedule_id,))
+            cursor = conn.execute(
+                "DELETE FROM delivery_schedules WHERE id = ?", (schedule_id,)
+            )
             return cursor.rowcount > 0
 
     def _row_to_schedule(self, row: sqlite3.Row) -> DeliverySchedule:
