@@ -9,9 +9,13 @@
 - Use `with db.transaction()` context manager for write operations (auto commit/rollback)
 - SQLite stores booleans as INTEGER (0/1) - convert when reading rows
 - ebooklib lacks type stubs - mypy override for "ebooklib.*" is in pyproject.toml
+- nltk lacks type stubs - mypy override for "nltk.*" is in pyproject.toml
 - Book text extraction is in `src/booktok/book_processor.py` with BookProcessor class
 - Use `process_book_safely()` for safe processing with error handling and status updates
 - ProcessingResult dataclass provides structured success/error responses with user messages
+- Snippet generation in `src/booktok/snippet_generator.py` with SnippetGenerator class
+- Use `generate_snippets_safely()` for safe snippet generation with error handling
+- Clear mypy cache with `rm -rf .mypy_cache` if pyproject.toml mypy config changes aren't picked up
 
 ---
 
@@ -123,4 +127,26 @@ Thread: https://ampcode.com/threads/T-019ba8ee-9d53-754d-b58d-096f8e424a74
   - Use ProcessingResult for safe processing with user-friendly error messages
   - process_book_safely() handles all exceptions and updates book status
   - File size limits: MIN=100 bytes, MAX=100MB
+---
+
+## 2026-01-10 - US-007
+Thread: https://ampcode.com/threads/T-019ba8f1-b1ae-7100-ac54-25e5cf477125
+- What was implemented:
+  - Created SnippetGenerator class with NLTK integration for text processing
+  - Implemented paragraph boundary detection using double-newline splitting
+  - Snippets extracted as 1-2 paragraph chunks based on target length (800 chars)
+  - Sequential position markers (0-indexed) assigned to each snippet
+  - Snippet objects created with book_id and position metadata
+  - Added generate_snippets_safely() with SnippetGenerationResult for error handling
+  - Added NLTK punkt_tab tokenizer auto-download for sentence detection
+- Files changed:
+  - src/booktok/snippet_generator.py - New file with SnippetGenerator class
+  - src/booktok/__init__.py - Exported SnippetGenerator, SnippetGenerationError, SnippetGenerationResult
+  - pyproject.toml - Added mypy override for nltk module
+- **Learnings for future iterations:**
+  - nltk lacks type stubs - need mypy override in pyproject.toml
+  - Use `nltk.data.find("tokenizers/punkt_tab")` to check if data exists before download
+  - Paragraph detection: split on `\n\s*\n` regex, filter paragraphs < 20 chars
+  - Snippet constants: MIN_LENGTH=100, MAX_LENGTH=3500, TARGET_LENGTH=800
+  - Clear mypy cache if pyproject.toml config changes aren't picked up
 ---
