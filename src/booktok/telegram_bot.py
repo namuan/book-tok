@@ -287,6 +287,9 @@ class TelegramBotInterface:
                 parse_mode="Markdown",
             )
 
+        active_progress.current_position = next_position + 1
+        self.progress_repo.update(active_progress)
+
         logger.info(
             f"Delivered snippet {next_position + 1}/{total_snippets} "
             f"from book '{book.title}' to user {telegram_id}"

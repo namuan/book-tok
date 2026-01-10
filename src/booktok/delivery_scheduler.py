@@ -729,13 +729,16 @@ class AutomatedDeliveryRunner:
                 break
         
         if all_sent:
+            progress.current_position += 1
+            self.progress_repo.update(progress)
+
             return DeliveryResult(
                 schedule_id=schedule.id or 0,
                 user_id=schedule.user_id,
                 book_id=schedule.book_id,
                 success=True,
                 message="Snippet delivered successfully",
-                snippet_position=progress.current_position,
+                snippet_position=progress.current_position - 1,
             )
         else:
             return DeliveryResult(
