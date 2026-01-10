@@ -10,6 +10,8 @@
 - SQLite stores booleans as INTEGER (0/1) - convert when reading rows
 - ebooklib lacks type stubs - mypy override for "ebooklib.*" is in pyproject.toml
 - Book text extraction is in `src/booktok/book_processor.py` with BookProcessor class
+- Use `process_book_safely()` for safe processing with error handling and status updates
+- ProcessingResult dataclass provides structured success/error responses with user messages
 
 ---
 
@@ -100,4 +102,25 @@ Thread: https://ampcode.com/threads/T-019ba8eb-4b56-726a-922f-d9b69a7d1edc
   - Use `epub.read_epub(path, options={"ignore_ncx": True})` to avoid NCX parsing issues
   - EPUB items of type ITEM_DOCUMENT contain the readable content
   - BeautifulSoup `get_text(separator="\n")` preserves paragraph structure
+---
+
+## 2026-01-10 - US-006
+Thread: https://ampcode.com/threads/T-019ba8ee-9d53-754d-b58d-096f8e424a74
+- What was implemented:
+  - Added file validation before processing (size limits, magic byte checks)
+  - Created ProcessingResult dataclass for structured error responses
+  - Added validate_file() method with comprehensive checks
+  - Implemented process_book_safely() method with full error handling
+  - Added _mark_as_failed() to set BookStatus.FAILED on errors
+  - All errors logged with details (exc_info=True)
+  - User-friendly error messages returned via ProcessingResult
+- Files changed:
+  - src/booktok/book_processor.py - Added validation, ProcessingResult, safe processing
+  - src/booktok/__init__.py - Exported ProcessingResult
+- **Learnings for future iterations:**
+  - PDF files start with b"%PDF" magic bytes
+  - EPUB files are ZIP archives (start with b"PK\x03\x04")
+  - Use ProcessingResult for safe processing with user-friendly error messages
+  - process_book_safely() handles all exceptions and updates book status
+  - File size limits: MIN=100 bytes, MAX=100MB
 ---
