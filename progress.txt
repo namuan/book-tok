@@ -3,6 +3,8 @@
 - All functions must have return type annotations for strict mypy
 - Database module is at `src/booktok/database.py` with `initialize_database()` function
 - Use `uv sync` and `uv add` for dependency management
+- Data models are in `src/booktok/models.py` with enums: BookStatus, FileType, Frequency
+- All dataclasses have `validate()` method and call it in `__post_init__()`
 
 ---
 
@@ -20,4 +22,20 @@ Thread: https://ampcode.com/threads/T-019ba8e3-1cce-72a9-877a-200b1a225c86
   - Project uses strict mypy configuration - all functions need type annotations
   - Database schema includes: users, books, snippets, user_progress, delivery_schedules
   - Tables use INTEGER for booleans (is_completed, is_paused)
+---
+
+## 2026-01-10 - US-002
+Thread: https://ampcode.com/threads/T-019ba8e5-1636-73eb-a6be-37164bcce51c
+- What was implemented:
+  - Created data model dataclasses for User, Book, Snippet, UserProgress, DeliverySchedule
+  - Added enums for BookStatus, FileType, and Frequency
+  - Implemented validate() method for each dataclass
+  - All models use __post_init__ for automatic validation
+- Files changed:
+  - src/booktok/models.py - New file with all data models
+- **Learnings for future iterations:**
+  - Use Enum types for constrained choices (BookStatus, FileType, Frequency)
+  - ValidationError is a custom exception in models.py
+  - delivery_time format is "HH:MM" (24-hour format)
+  - Database IDs are Optional[int] since they're set by DB on insert
 ---
