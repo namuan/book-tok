@@ -347,6 +347,110 @@ class DeliveryScheduler:
         
         return "\n".join(lines)
     
+    def pause_schedule(self, user_id: int, book_id: int) -> bool:
+        """Pause automatic deliveries for a specific schedule.
+        
+        Args:
+            user_id: Database ID of the user.
+            book_id: Database ID of the book.
+        
+        Returns:
+            True if schedule was paused, False if no schedule exists.
+        """
+        schedule = self.schedule_repo.get_by_user_and_book(user_id, book_id)
+        if schedule is None:
+            return False
+        
+        if schedule.is_paused:
+            logger.info(f"Schedule for user {user_id}, book {book_id} already paused")
+            return True
+        
+        schedule.is_paused = True
+        self.schedule_repo.update(schedule)
+        logger.info(f"Paused schedule for user {user_id}, book {book_id}")
+        return True
+    
+    def resume_schedule(self, user_id: int, book_id: int) -> bool:
+        """Resume automatic deliveries for a specific schedule.
+        
+        Args:
+            user_id: Database ID of the user.
+            book_id: Database ID of the book.
+        
+        Returns:
+            True if schedule was resumed, False if no schedule exists.
+        """
+        schedule = self.schedule_repo.get_by_user_and_book(user_id, book_id)
+        if schedule is None:
+            return False
+        
+        if not schedule.is_paused:
+            logger.info(f"Schedule for user {user_id}, book {book_id} already active")
+            return True
+        
+        user = self.user_repo.get_by_id(user_id)
+        user_tz = user.timezone if user else "UTC"
+        
+        schedule.is_paused = False
+        schedule.next_delivery_at = self._calculate_next_delivery(
+            schedule.delivery_time,
+            schedule.frequency,
+            user_tz,
+        )
+        self.schedule_repo.update(schedule)
+        logger.info(f"Resumed schedule for user {user_id}, book {book_id}")
+        return True
+    
+    def pause_all_schedules(self, user_id: int) -> int:
+        """Pause all delivery schedules for a user.
+        
+        Args:
+            user_id: Database ID of the user.
+        
+        Returns:
+            Number of schedules that were paused.
+        """
+        schedules = self.schedule_repo.list_by_user(user_id)
+        paused_count = 0
+        
+        for schedule in schedules:
+            if not schedule.is_paused:
+                schedule.is_paused = True
+                self.schedule_repo.update(schedule)
+                paused_count += 1
+        
+        logger.info(f"Paused {paused_count} schedules for user {user_id}")
+        return paused_count
+    
+    def resume_all_schedules(self, user_id: int) -> int:
+        """Resume all delivery schedules for a user.
+        
+        Args:
+            user_id: Database ID of the user.
+        
+        Returns:
+            Number of schedules that were resumed.
+        """
+        user = self.user_repo.get_by_id(user_id)
+        user_tz = user.timezone if user else "UTC"
+        
+        schedules = self.schedule_repo.list_by_user(user_id)
+        resumed_count = 0
+        
+        for schedule in schedules:
+            if schedule.is_paused:
+                schedule.is_paused = False
+                schedule.next_delivery_at = self._calculate_next_delivery(
+                    schedule.delivery_time,
+                    schedule.frequency,
+                    user_tz,
+                )
+                self.schedule_repo.update(schedule)
+                resumed_count += 1
+        
+        logger.info(f"Resumed {resumed_count} schedules for user {user_id}")
+        return resumed_count
+
     def _validate_timezone(self, timezone: str) -> None:
         """Validate that a timezone string is valid.
         

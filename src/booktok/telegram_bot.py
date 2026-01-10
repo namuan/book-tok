@@ -12,10 +12,12 @@ from telegram.ext import (
     filters,
 )
 
+from booktok.delivery_scheduler import DeliveryScheduler
 from booktok.models import User
 from booktok.repository import (
     BookRepository,
     DatabaseConnectionManager,
+    DeliveryScheduleRepository,
     SnippetRepository,
     UserProgressRepository,
     UserRepository,
@@ -51,6 +53,8 @@ HELP_MESSAGE = """📖 *BookTok Commands*
 
 *Snippet Delivery:*
 /next - Get the next snippet immediately
+/pause - Pause automatic snippet deliveries
+/resume - Resume automatic snippet deliveries
 
 *Schedule:*
 (Coming soon - set your delivery schedule)
@@ -69,16 +73,20 @@ I didn't understand that command.
 /start - Start the bot and create your profile
 /help - Show all available commands
 /next - Get the next snippet immediately
+/pause - Pause automatic deliveries
+/resume - Resume automatic deliveries
 
 *Did you mean one of these?*
 • If you wanted to start: use /start
 • If you need help: use /help
 • To get the next snippet: use /next
+• To pause deliveries: use /pause
+• To resume deliveries: use /resume
 
 Tip: Commands always start with a forward slash (/)"""
 
 
-VALID_COMMANDS = ["start", "help", "next"]
+VALID_COMMANDS = ["start", "help", "next", "pause", "resume"]
 
 
 class TelegramBotInterface:
@@ -101,6 +109,8 @@ class TelegramBotInterface:
         self.book_repo = BookRepository(db_manager)
         self.snippet_repo = SnippetRepository(db_manager)
         self.progress_repo = UserProgressRepository(db_manager)
+        self.schedule_repo = DeliveryScheduleRepository(db_manager)
+        self.scheduler = DeliveryScheduler(db_manager)
         self.application: Optional[Application] = None  # type: ignore[type-arg]
 
     def build_application(self) -> Application:  # type: ignore[type-arg]
@@ -121,10 +131,12 @@ class TelegramBotInterface:
         self.application.add_handler(CommandHandler("start", self._handle_start))
         self.application.add_handler(CommandHandler("help", self._handle_help))
         self.application.add_handler(CommandHandler("next", self._handle_next))
+        self.application.add_handler(CommandHandler("pause", self._handle_pause))
+        self.application.add_handler(CommandHandler("resume", self._handle_resume))
         
         self.application.add_handler(
             MessageHandler(
-                filters.COMMAND & ~filters.Regex(r"^/(start|help|next)"),
+                filters.COMMAND & ~filters.Regex(r"^/(start|help|next|pause|resume)"),
                 self._handle_unrecognized_command,
             )
         )
@@ -280,6 +292,124 @@ class TelegramBotInterface:
             f"from book '{book.title}' to user {telegram_id}"
         )
 
+    async def _handle_pause(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle the /pause command.
+
+        Pauses automatic snippet deliveries for the user.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.effective_user is None or update.message is None:
+            return
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None:
+            await update.message.reply_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        if user.id is None:
+            await update.message.reply_text(
+                "An error occurred. Please try /start again.",
+            )
+            return
+
+        paused_count = self.scheduler.pause_all_schedules(user.id)
+
+        if paused_count == 0:
+            schedules = self.schedule_repo.list_by_user(user.id)
+            if not schedules:
+                await update.message.reply_text(
+                    "⏸️ *No Schedules to Pause*\n\n"
+                    "You don't have any delivery schedules set up yet.\n"
+                    "Upload a book and set a schedule to get started!",
+                    parse_mode="Markdown",
+                )
+            else:
+                await update.message.reply_text(
+                    "⏸️ *Already Paused*\n\n"
+                    "All your delivery schedules are already paused.\n"
+                    "Use /resume to restart automatic deliveries.",
+                    parse_mode="Markdown",
+                )
+        else:
+            await update.message.reply_text(
+                f"⏸️ *Deliveries Paused*\n\n"
+                f"Paused {paused_count} delivery schedule(s).\n\n"
+                "You can still use /next to get snippets manually.\n"
+                "Use /resume to restart automatic deliveries.",
+                parse_mode="Markdown",
+            )
+            logger.info(f"User {telegram_id} paused {paused_count} schedules")
+
+    async def _handle_resume(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle the /resume command.
+
+        Resumes automatic snippet deliveries for the user.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.effective_user is None or update.message is None:
+            return
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None:
+            await update.message.reply_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        if user.id is None:
+            await update.message.reply_text(
+                "An error occurred. Please try /start again.",
+            )
+            return
+
+        resumed_count = self.scheduler.resume_all_schedules(user.id)
+
+        if resumed_count == 0:
+            schedules = self.schedule_repo.list_by_user(user.id)
+            if not schedules:
+                await update.message.reply_text(
+                    "▶️ *No Schedules to Resume*\n\n"
+                    "You don't have any delivery schedules set up yet.\n"
+                    "Upload a book and set a schedule to get started!",
+                    parse_mode="Markdown",
+                )
+            else:
+                await update.message.reply_text(
+                    "▶️ *Already Active*\n\n"
+                    "All your delivery schedules are already active.\n"
+                    "Use /pause to stop automatic deliveries.",
+                    parse_mode="Markdown",
+                )
+        else:
+            await update.message.reply_text(
+                f"▶️ *Deliveries Resumed*\n\n"
+                f"Resumed {resumed_count} delivery schedule(s).\n\n"
+                "You will start receiving snippets at your scheduled times.\n"
+                "Use /pause to stop automatic deliveries.",
+                parse_mode="Markdown",
+            )
+            logger.info(f"User {telegram_id} resumed {resumed_count} schedules")
+
     async def _handle_unrecognized_command(
         self,
         update: Update,
@@ -357,6 +487,12 @@ Try /help to see the list of available commands!"""
             "more": "/next",
             "read": "/next",
             "snippet": "/next",
+            "stop": "/pause",
+            "paused": "/pause",
+            "halt": "/pause",
+            "unpause": "/resume",
+            "restart": "/resume",
+            "resumed": "/resume",
         }
         
         for key, suggestion in common_mistakes.items():
