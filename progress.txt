@@ -25,27 +25,29 @@
 
 ---
 
-## 2026-01-10 - US-020
-Thread: https://ampcode.com/threads/T-019ba90b-1c3d-72ed-9c4c-39c22c9e2f5c
+## 2026-01-10 - US-021
+Thread: https://ampcode.com/threads/T-019ba90c-1c4f-72ef-9c5c-39c22c0e2f5c
 - What was implemented:
-  - Enhanced database.py with comprehensive error handling
-  - Added DatabaseError, DatabaseConnectionError, DatabaseIntegrityError, DatabaseCorruptedError exceptions
-  - Added retry logic to initialize_database() with configurable max_retries
-  - Added check_database_integrity() for data consistency verification
-  - Added recover_database() for corruption recovery with backup creation
-  - Added PRAGMA settings for WAL mode and foreign key enforcement
+  - Created config.py with AppConfig and sub-configs (Database, Telegram, Scheduler, Logging)
+  - Added load_config() to read from environment variables
+  - Added setup_logging() for configurable logging with file support
+  - Added validate_config() for configuration validation
+  - Updated main.py with BookTokApplication class
+  - BookTokApplication initializes all components (db, bot, scheduler)
+  - Added graceful shutdown handling with signal handlers
   - All exports added to __init__.py and __all__
-  - Updated prd.json to mark US-020 as passes=true
+  - Updated prd.json to mark US-021 as passes=true
 - Files changed:
-  - src/booktok/database.py - Added error handling, recovery, integrity checks
-  - src/booktok/__init__.py - Added exports for database functions
-  - prd.json - Updated passes field for US-020
+  - src/booktok/config.py - New file with configuration management
+  - src/main.py - Updated with BookTokApplication class and main entry point
+  - src/booktok/__init__.py - Added exports for config functions
+  - prd.json - Updated passes field for US-021
 - **Learnings for future iterations:**
-  - Use PRAGMA journal_mode=WAL for better concurrency
-  - Use PRAGMA foreign_keys=ON for referential integrity
-  - WAL checkpoint and VACUUM can help recover corrupted databases
-  - Always backup before attempting recovery
-  - Log with exc_info=True for database errors to capture full context
+  - Use environment variables for configuration (BOOKTOK_*, TELEGRAM_* prefixes)
+  - Log level configurable via BOOKTOK_LOG_LEVEL
+  - Use asyncio.create_task() for graceful shutdown
+  - Add signal handlers for SIGINT and SIGTERM
+  - Application initializes all components before starting
 ---
 
 ## 2026-01-10 - US-002
