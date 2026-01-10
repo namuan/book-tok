@@ -317,3 +317,21 @@ Thread: https://ampcode.com/threads/T-019ba906-15d3-72e5-a7c9-06f0b3ae2f5c
   - Both use the same UserProgress model and repository for consistency
   - current_position is 0-indexed in database, displayed as 1-indexed to users
 ---
+
+## 2026-01-10 - US-016
+Thread: https://ampcode.com/threads/T-019ba907-1a5f-72c7-894b-26c25f7bcbef
+- What was implemented:
+  - Added initialize_progress() method to UserProgressRepository
+  - Method checks if progress exists, creates new record with current_position=0, is_completed=False if not
+  - Added start_book() method to TelegramBotInterface for initializing user progress on a book
+  - Added UserProgress import to telegram_bot.py
+  - Updated prd.json to mark US-016 as passes=true
+- Files changed:
+  - src/booktok/repository.py - Added initialize_progress() method
+  - src/booktok/telegram_bot.py - Added start_book() method and UserProgress import
+  - prd.json - Updated passes field for US-016
+- **Learnings for future iterations:**
+  - Use initialize_progress() pattern for creating records only if they don't exist
+  - Import UserProgress model when using progress types in telegram_bot.py
+  - start_book() can be called when a user wants to begin reading a specific book
+---

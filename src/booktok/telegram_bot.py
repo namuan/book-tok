@@ -1,6 +1,7 @@
 """Telegram bot interface with command handlers."""
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 from telegram import Update
@@ -288,12 +289,30 @@ class TelegramBotInterface:
             )
 
         active_progress.current_position = next_position + 1
+
+        if active_progress.current_position >= total_snippets:
+            active_progress.is_completed = True
+            active_progress.completed_at = datetime.utcnow()
+            await update.message.reply_text(
+                f"🎉 *Congratulations!*\n\n"
+                f"You've completed *{book.title}*!\n\n"
+                f"📚 Total snippets read: {total_snippets}\n\n"
+                f"Great job on finishing this book! 🏆",
+                parse_mode="Markdown",
+            )
+
         self.progress_repo.update(active_progress)
 
-        logger.info(
-            f"Delivered snippet {next_position + 1}/{total_snippets} "
-            f"from book '{book.title}' to user {telegram_id}"
-        )
+        if active_progress.current_position >= total_snippets:
+            logger.info(
+                f"User {telegram_id} completed book '{book.title}' "
+                f"after delivering snippet {next_position + 1}/{total_snippets}"
+            )
+        else:
+            logger.info(
+                f"Delivered snippet {next_position + 1}/{total_snippets} "
+                f"from book '{book.title}' to user {telegram_id}"
+            )
 
     async def _handle_pause(
         self,
