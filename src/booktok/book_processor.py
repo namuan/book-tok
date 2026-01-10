@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 from typing import Optional
 
+import ebooklib
+from bs4 import BeautifulSoup
+from ebooklib import epub
 from PyPDF2 import PdfReader
 from PyPDF2.errors import PdfReadError
 
@@ -66,7 +69,7 @@ class BookProcessor:
         if self.book.file_type == FileType.PDF:
             self._extracted_text = self._extract_pdf_text(file_path)
         elif self.book.file_type == FileType.EPUB:
-            raise UnsupportedFileTypeError("EPUB extraction not yet implemented")
+            self._extracted_text = self._extract_epub_text(file_path)
         else:
             raise UnsupportedFileTypeError(
                 f"Unsupported file type: {self.book.file_type}"
@@ -118,6 +121,51 @@ class BookProcessor:
             raise InvalidFileError(
                 "Could not extract any text from PDF (may be image-based)"
             )
+
+        raw_text = "\n\n".join(text_parts)
+        return self._clean_and_normalize_text(raw_text)
+
+    def _extract_epub_text(self, file_path: Path) -> str:
+        """Extract text from an EPUB file.
+
+        Args:
+            file_path: Path to the EPUB file.
+
+        Returns:
+            The extracted and cleaned text content.
+
+        Raises:
+            InvalidFileError: If the EPUB is invalid or corrupted.
+            BookProcessingError: If extraction fails.
+        """
+        try:
+            book = epub.read_epub(str(file_path), options={"ignore_ncx": True})
+        except ebooklib.epub.EpubException as e:
+            logger.error(f"Failed to read EPUB {file_path}: {e}")
+            raise InvalidFileError(f"Invalid or corrupted EPUB file: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error reading EPUB {file_path}: {e}")
+            raise BookProcessingError(f"Failed to open EPUB file: {e}") from e
+
+        text_parts: list[str] = []
+
+        for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+            try:
+                content = item.get_content()
+                soup = BeautifulSoup(content, "html.parser")
+
+                for script in soup(["script", "style"]):
+                    script.decompose()
+
+                text = soup.get_text(separator="\n")
+                if text.strip():
+                    text_parts.append(text)
+            except Exception as e:
+                logger.warning(f"Failed to extract text from EPUB item: {e}")
+                continue
+
+        if not text_parts:
+            raise InvalidFileError("Could not extract any text from EPUB")
 
         raw_text = "\n\n".join(text_parts)
         return self._clean_and_normalize_text(raw_text)
