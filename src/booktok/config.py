@@ -48,6 +48,13 @@ class LoggingConfig:
 
 
 @dataclass
+class BooksConfig:
+    """Books directory configuration settings."""
+
+    directory: str = "books"
+
+
+@dataclass
 class AppConfig:
     """Main application configuration."""
 
@@ -55,6 +62,7 @@ class AppConfig:
     telegram: TelegramConfig = field(default_factory=TelegramConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    books: BooksConfig = field(default_factory=BooksConfig)
 
 
 def load_config(config_path: Optional[str] = None) -> AppConfig:
@@ -104,6 +112,10 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     log_file = os.environ.get("BOOKTOK_LOG_FILE")
     if log_file:
         config.logging.file = log_file
+
+    books_dir = os.environ.get("BOOKTOK_BOOKS_DIR")
+    if books_dir:
+        config.books.directory = os.path.expanduser(books_dir)
 
     return config
 

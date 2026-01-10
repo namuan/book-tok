@@ -60,6 +60,7 @@ class BookTokApplication:
         self.bot_interface = TelegramBotInterface(
             token=self.config.telegram.token,
             db_manager=self.db_manager,
+            books_config=self.config.books,
         )
         logger.info("Telegram bot interface initialized")
 

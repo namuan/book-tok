@@ -18,6 +18,10 @@ from booktok.book_processor import (
     ProcessingResult,
     UnsupportedFileTypeError,
 )
+from booktok.book_scanner import (
+    BookFile,
+    BookScanner,
+)
 from booktok.snippet_generator import (
     SnippetGenerator,
     SnippetGenerationError,
@@ -70,6 +74,7 @@ from booktok.database import (
 )
 from booktok.config import (
     AppConfig,
+    BooksConfig,
     DatabaseConfig,
     TelegramConfig,
     SchedulerConfig,
@@ -88,12 +93,16 @@ __all__ = [
     "AppConfig",
     "AutomatedDeliveryRunner",
     "Book",
+    "BookFile",
     "BookNotFoundError",
     "BookProcessor",
     "BookProcessingError",
+    "BookScanner",
+    "BooksConfig",
     "BookStatus",
     "check_database_integrity",
     "close_database",
+    "create_tables",
     "DatabaseConfig",
     "DatabaseConnectionError",
     "DatabaseCorruptedError",
@@ -109,6 +118,7 @@ __all__ = [
     "get_database_path",
     "get_safe_content_length",
     "HELP_MESSAGE",
+    "initialize_database",
     "InputValidationError",
     "InvalidFileError",
     "InvalidScheduleError",

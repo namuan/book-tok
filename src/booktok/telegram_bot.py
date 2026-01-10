@@ -13,6 +13,8 @@ from telegram.ext import (
     filters,
 )
 
+from booktok.book_scanner import BookScanner
+from booktok.config import BooksConfig
 from booktok.delivery_scheduler import DeliveryScheduler
 from booktok.models import User, UserProgress
 from booktok.repository import (
@@ -50,7 +52,7 @@ HELP_MESSAGE = """📖 *BookTok Commands*
 /help - Show this help message
 
 *Book Management:*
-(Coming soon - upload books to get started)
+/books - List available books to read
 
 *Snippet Delivery:*
 /next - Get the next snippet immediately
@@ -73,6 +75,7 @@ I didn't understand that command.
 *Available commands:*
 /start - Start the bot and create your profile
 /help - Show all available commands
+/books - List available books
 /next - Get the next snippet immediately
 /pause - Pause automatic deliveries
 /resume - Resume automatic deliveries
@@ -80,6 +83,7 @@ I didn't understand that command.
 *Did you mean one of these?*
 • If you wanted to start: use /start
 • If you need help: use /help
+• To see available books: use /books
 • To get the next snippet: use /next
 • To pause deliveries: use /pause
 • To resume deliveries: use /resume
@@ -87,7 +91,7 @@ I didn't understand that command.
 Tip: Commands always start with a forward slash (/)"""
 
 
-VALID_COMMANDS = ["start", "help", "next", "pause", "resume"]
+VALID_COMMANDS = ["start", "help", "books", "next", "pause", "resume"]
 
 
 class TelegramBotInterface:
@@ -97,15 +101,19 @@ class TelegramBotInterface:
         self,
         token: str,
         db_manager: DatabaseConnectionManager,
+        books_config: BooksConfig,
     ) -> None:
         """Initialize the Telegram bot interface.
 
         Args:
             token: Telegram bot API token.
             db_manager: Database connection manager.
+            books_config: Books directory configuration.
         """
         self.token = token
         self.db_manager = db_manager
+        self.books_config = books_config
+        self.book_scanner = BookScanner(books_config.directory)
         self.user_repo = UserRepository(db_manager)
         self.book_repo = BookRepository(db_manager)
         self.snippet_repo = SnippetRepository(db_manager)
@@ -131,13 +139,15 @@ class TelegramBotInterface:
 
         self.application.add_handler(CommandHandler("start", self._handle_start))
         self.application.add_handler(CommandHandler("help", self._handle_help))
+        self.application.add_handler(CommandHandler("books", self._handle_books))
         self.application.add_handler(CommandHandler("next", self._handle_next))
         self.application.add_handler(CommandHandler("pause", self._handle_pause))
         self.application.add_handler(CommandHandler("resume", self._handle_resume))
 
         self.application.add_handler(
             MessageHandler(
-                filters.COMMAND & ~filters.Regex(r"^/(start|help|next|pause|resume)"),
+                filters.COMMAND
+                & ~filters.Regex(r"^/(start|help|books|next|pause|resume)"),
                 self._handle_unrecognized_command,
             )
         )
@@ -211,6 +221,72 @@ class TelegramBotInterface:
             HELP_MESSAGE,
             parse_mode="Markdown",
         )
+
+    async def _handle_books(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle the /books command.
+
+        Lists all available books from the configured books directory.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.effective_user is None or update.message is None:
+            return
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None:
+            await update.message.reply_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        # Scan for available books
+        books = self.book_scanner.scan()
+
+        if not books:
+            await update.message.reply_text(
+                "📚 *No Books Available*\n\n"
+                f"No books found in the configured directory.\n\n"
+                f"Directory: `{self.books_config.directory}`\n\n"
+                "Please contact the administrator to add books.",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Build message with book list
+        message_lines = ["📚 *Available Books*\n"]
+        message_lines.append(f"Found {len(books)} book(s):\n")
+
+        for idx, book in enumerate(books, start=1):
+            size_str = self.book_scanner.format_size(book.size_bytes)
+            file_type = book.file_type.value.upper()
+            message_lines.append(
+                f"{idx}. *{book.display_name}*\n"
+                f"   📄 File: `{book.filename}`\n"
+                f"   📊 Type: {file_type} | Size: {size_str}\n"
+            )
+
+        message_lines.append(
+            "\n💡 *Coming Soon:*\n"
+            "Selection and processing features are under development.\n"
+            "Stay tuned!"
+        )
+
+        message = "\n".join(message_lines)
+
+        await update.message.reply_text(
+            message,
+            parse_mode="Markdown",
+        )
+
+        logger.info(f"User {telegram_id} listed {len(books)} available books")
 
     async def _handle_next(
         self,
