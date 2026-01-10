@@ -31,6 +31,10 @@ disallow_incomplete_defs = true
 module = ["ebooklib", "ebooklib.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["nltk", "nltk.*"]
+ignore_missing_imports = true
+
 [tool.uv.workspace]
 members = [
     "booktok",

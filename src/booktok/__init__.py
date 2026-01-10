@@ -18,6 +18,11 @@ from booktok.book_processor import (
     ProcessingResult,
     UnsupportedFileTypeError,
 )
+from booktok.snippet_generator import (
+    SnippetGenerator,
+    SnippetGenerationError,
+    SnippetGenerationResult,
+)
 
 
 def main() -> None:
@@ -35,6 +40,9 @@ __all__ = [
     "InvalidFileError",
     "ProcessingResult",
     "Snippet",
+    "SnippetGenerationError",
+    "SnippetGenerationResult",
+    "SnippetGenerator",
     "UnsupportedFileTypeError",
     "User",
     "UserProgress",
