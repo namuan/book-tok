@@ -56,6 +56,18 @@ from booktok.input_validator import (
     validate_message_text,
     ValidationError as InputValidationError,
 )
+from booktok.database import (
+    initialize_database,
+    create_tables,
+    close_database,
+    check_database_integrity,
+    recover_database,
+    get_database_path,
+    DatabaseError,
+    DatabaseConnectionError,
+    DatabaseIntegrityError,
+    DatabaseCorruptedError,
+)
 
 
 def main() -> None:
@@ -69,6 +81,12 @@ __all__ = [
     "BookProcessor",
     "BookProcessingError",
     "BookStatus",
+    "check_database_integrity",
+    "close_database",
+    "DatabaseConnectionError",
+    "DatabaseCorruptedError",
+    "DatabaseError",
+    "DatabaseIntegrityError",
     "DeliveryResult",
     "DeliverySchedule",
     "DeliveryScheduler",
@@ -76,6 +94,7 @@ __all__ = [
     "FormattedMessage",
     "FormattedSnippet",
     "Frequency",
+    "get_database_path",
     "get_safe_content_length",
     "HELP_MESSAGE",
     "InputValidationError",
@@ -84,6 +103,7 @@ __all__ = [
     "InvalidTimezoneError",
     "main",
     "ProcessingResult",
+    "recover_database",
     "ScheduleInfo",
     "SchedulerError",
     "sanitize_filename",
@@ -99,8 +119,8 @@ __all__ = [
     "User",
     "UserNotFoundError",
     "UserProgress",
-    "validate_book_title",
     "validate_author",
+    "validate_book_title",
     "validate_message_length",
     "validate_message_text",
     "validate_telegram_id",

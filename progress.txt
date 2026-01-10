@@ -25,24 +25,28 @@
 
 ---
 
-## 2026-01-10 - US-018
-Thread: https://ampcode.com/threads/T-019ba909-1cbf-72db-8a2e-26c2ba9e2fb1
+## 2026-01-10 - US-019
+Thread: https://ampcode.com/threads/T-019ba90a-1c1e-72e7-9c3c-39c22c8e2f5c
 - What was implemented:
-  - Added _send_message_with_retry() method with exponential backoff
-  - MAX_RETRIES=5, INITIAL_BACKOFF=1s, BACKOFF_MULTIPLIER=2.0, MAX_BACKOFF=30s
-  - Retry logic catches exceptions and logs failures at each attempt
-  - Added attempts field to DeliveryResult for tracking
-  - Failed deliveries logged with error details for admin review
-  - Updated _deliver_snippet to use retry mechanism
-  - Updated prd.json to mark US-018 as passes=true
+  - Created input_validator.py with comprehensive validation utilities
+  - Added sanitize_text() for HTML escaping and dangerous character removal
+  - Added sanitize_filename() for path traversal prevention
+  - Added validate_telegram_id() for Telegram ID validation
+  - Added validate_book_title() and validate_author() for content validation
+  - Added sanitize_for_markdown() for Telegram Markdown safety
+  - Added validate_message_text() for message length and content validation
+  - All exports added to __init__.py and __all__
+  - Updated prd.json to mark US-019 as passes=true
 - Files changed:
-  - src/booktok/delivery_scheduler.py - Added retry mechanism and _send_message_with_retry
-  - prd.json - Updated passes field for US-018
+  - src/booktok/input_validator.py - New file with validation utilities
+  - src/booktok/__init__.py - Added exports for validator functions
+  - prd.json - Updated passes field for US-019
 - **Learnings for future iterations:**
-  - Exponential backoff prevents API rate limiting during failures
-  - Log attempts at each failure level to diagnose issues
-  - DeliveryResult.attempts tracks total attempts made for delivery
-  - System remains operational - exceptions don't crash the delivery loop
+  - Use html.escape() for basic HTML injection prevention
+  - Sanitize filenames to prevent path traversal (os.path.basename, check for dots)
+  - Validate Telegram IDs are positive integers within valid range
+  - Markdown escaping requires escaping special chars: _ * [ ] ( ) ~ ` > # + - = | { } . !
+  - Use ValidationError exception for consistent error handling
 ---
 
 ## 2026-01-10 - US-002
