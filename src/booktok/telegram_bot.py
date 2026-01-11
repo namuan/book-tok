@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.error import BadRequest
+from telegram.error import BadRequest, NetworkError, TelegramError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -526,6 +526,43 @@ class TelegramBotInterface:
         """Handle the /next command.
 
         Delivers the next sequential snippet from the user's active book.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.effective_user is None or update.message is None:
+            return
+
+        try:
+            await self._handle_next_impl(update, context)
+        except (NetworkError, TelegramError) as e:
+            logger.error(f"Error delivering snippet: {e}", exc_info=True)
+            if update.message:
+                try:
+                    await update.message.reply_text(
+                        "⚠️ Sorry, something went wrong. Please try again.\n\n"
+                        "Tap /next to continue reading."
+                    )
+                except Exception as retry_error:
+                    logger.error(f"Failed to send error message: {retry_error}")
+        except Exception as e:
+            logger.error(f"Unexpected error in _handle_next: {e}", exc_info=True)
+            if update.message:
+                try:
+                    await update.message.reply_text(
+                        "⚠️ Sorry, something went wrong. Please try again.\n\n"
+                        "Tap /next to continue reading."
+                    )
+                except Exception as retry_error:
+                    logger.error(f"Failed to send error message: {retry_error}")
+
+    async def _handle_next_impl(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Implementation of the /next command handler.
 
         Args:
             update: Telegram update object.
