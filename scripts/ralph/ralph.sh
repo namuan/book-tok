@@ -1,10 +1,44 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [max_iterations]
+#        ./ralph.sh --help
 
 set -e
 
-MAX_ITERATIONS=${1:-10}
+show_help() {
+  cat <<'EOF'
+Usage: ./ralph.sh [max_iterations]
+       ./ralph.sh --help
+
+Runs Ralph Wiggum's long-lived amp loop and archives the previous run when
+the branch has changed.
+
+Arguments:
+  max_iterations  Optional number of loop iterations (defaults to 10).
+  --help          Show this help message and exit.
+EOF
+  exit 0
+}
+
+MAX_ITERATIONS_ARG=""
+
+while (( $# )); do
+  case "$1" in
+    --help|-h)
+      show_help
+      ;;
+    *)
+      if [ -n "$MAX_ITERATIONS_ARG" ]; then
+        echo "Too many arguments: $1" >&2
+        show_help
+      fi
+      MAX_ITERATIONS_ARG="$1"
+      ;;
+  esac
+  shift
+done
+
+MAX_ITERATIONS=${MAX_ITERATIONS_ARG:-10}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
@@ -15,20 +49,20 @@ LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
   LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
-  
+
   if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
     # Archive the previous run
     DATE=$(date +%Y-%m-%d)
     # Strip "ralph/" prefix from branch name for folder
     FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
-    
+
     echo "Archiving previous run: $LAST_BRANCH"
     mkdir -p "$ARCHIVE_FOLDER"
     [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
     echo "   Archived to: $ARCHIVE_FOLDER"
-    
+
     # Reset progress file for new run
     echo "# Ralph Progress Log" > "$PROGRESS_FILE"
     echo "Started: $(date)" >> "$PROGRESS_FILE"
@@ -58,10 +92,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "═══════════════════════════════════════════════════════"
   echo "  Ralph Iteration $i of $MAX_ITERATIONS"
   echo "═══════════════════════════════════════════════════════"
-  
+
   # Run amp with the ralph prompt
   OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  
+
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
@@ -69,7 +103,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
   fi
-  
+
   echo "Iteration $i complete. Continuing..."
   sleep 2
 done
