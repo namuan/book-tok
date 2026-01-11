@@ -78,7 +78,7 @@ HELP_MESSAGE = """📖 *BookTok Commands*
 /resume - Resume automatic snippet deliveries
 
 *Schedule:*
-(Coming soon - set your delivery schedule)
+/schedule - Set up automatic snippet delivery times
 
 *Progress:*
 (Coming soon - view your reading progress)
@@ -109,7 +109,7 @@ I didn't understand that command.
 Tip: Commands always start with a forward slash (/)"""
 
 
-VALID_COMMANDS = ["start", "help", "books", "next", "pause", "resume"]
+VALID_COMMANDS = ["start", "help", "books", "next", "pause", "resume", "schedule"]
 
 
 class TelegramBotInterface:
@@ -167,6 +167,7 @@ class TelegramBotInterface:
         self.application.add_handler(CommandHandler("next", self._handle_next))
         self.application.add_handler(CommandHandler("pause", self._handle_pause))
         self.application.add_handler(CommandHandler("resume", self._handle_resume))
+        self.application.add_handler(CommandHandler("schedule", self._handle_schedule))
 
         # Callback query handler for book selection
         self.application.add_handler(
@@ -863,6 +864,210 @@ class TelegramBotInterface:
                 parse_mode="Markdown",
             )
             logger.info(f"User {telegram_id} resumed {resumed_count} schedules")
+
+    async def _handle_schedule(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle /schedule command to set up automatic snippet delivery.
+
+        Args:
+            update: Telegram update object.
+            context: Callback context.
+        """
+        if update.message is None or update.message.from_user is None:
+            return
+
+        telegram_id = update.message.from_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None:
+            await update.message.reply_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        # Check if user has selected a book
+        progress_records = self.progress_repo.list_by_user(user.id)
+        if not progress_records:
+            await update.message.reply_text(
+                "⚠️ *No Book Selected*\n\n"
+                "You need to select a book first before setting up a schedule.\n\n"
+                "Use /books to select a book!",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Get the active book (most recent non-completed)
+        active_progress = None
+        for progress in progress_records:
+            if not progress.is_completed:
+                active_progress = progress
+                break
+
+        if active_progress is None:
+            await update.message.reply_text(
+                "⚠️ *No Active Book*\n\n"
+                "You've completed all your books! Use /books to select a new one.",
+                parse_mode="Markdown",
+            )
+            return
+
+        book = self.book_repo.get_by_id(active_progress.book_id)
+        if book is None:
+            await update.message.reply_text(
+                "Error: Book not found. Please select a book again using /books.",
+            )
+            return
+
+        # Parse the schedule parameters from the command
+        # Format: /schedule HH:MM [daily|twice_daily|weekly] [timezone]
+        # Example: /schedule 09:00 daily America/New_York
+        args = context.args or []
+
+        if len(args) == 0:
+            # Show current schedule if exists, otherwise show help
+            existing_schedule = self.scheduler.get_schedule(user.id, book.id or 0)
+            if existing_schedule:
+                schedule_info = self.scheduler.get_schedule_info(
+                    user.id,
+                    book.id or 0,
+                    book.title,
+                    book.author,
+                )
+                if schedule_info:
+                    await update.message.reply_text(
+                        f"📅 *Current Schedule*\n\n{schedule_info.format_for_display()}",
+                        parse_mode="Markdown",
+                    )
+                    return
+
+            # Show usage help
+            await update.message.reply_text(
+                "⏰ *Set Delivery Schedule*\n\n"
+                "*Usage:* `/schedule TIME [FREQUENCY] [TIMEZONE]`\n\n"
+                "*Examples:*\n"
+                "• `/schedule 09:00` - Daily at 9 AM (your local time)\n"
+                "• `/schedule 14:30 daily` - Daily at 2:30 PM\n"
+                "• `/schedule 08:00 twice_daily` - Every 12 hours starting at 8 AM\n"
+                "• `/schedule 10:00 weekly` - Weekly at 10 AM\n"
+                "• `/schedule 09:00 daily America/New_York` - With timezone\n\n"
+                "*Frequency options:*\n"
+                "• `daily` (default) - Once per day\n"
+                "• `twice_daily` - Every 12 hours\n"
+                "• `weekly` - Once per week\n\n"
+                f"*Your timezone:* {user.timezone}\n\n"
+                "💡 *Tip:* Just type the time to use default settings!",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Parse time (required)
+        time_str = args[0]
+        if ":" not in time_str or len(time_str.split(":")) != 2:
+            await update.message.reply_text(
+                "❌ *Invalid Time Format*\n\n"
+                "Please use HH:MM format (e.g., 09:00 or 14:30)\n\n"
+                "Example: `/schedule 09:00`",
+                parse_mode="Markdown",
+            )
+            return
+
+        try:
+            hour, minute = map(int, time_str.split(":"))
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid time")
+        except ValueError:
+            await update.message.reply_text(
+                "❌ *Invalid Time*\n\n"
+                "Hours must be 0-23 and minutes must be 0-59.\n\n"
+                "Example: `/schedule 09:00`",
+                parse_mode="Markdown",
+            )
+            return
+
+        # Parse frequency (optional, default: daily)
+        from booktok.models import Frequency
+
+        frequency = Frequency.DAILY
+        if len(args) > 1:
+            freq_str = args[1].lower()
+            if freq_str in ["daily", "d"]:
+                frequency = Frequency.DAILY
+            elif freq_str in ["twice_daily", "twice", "2x"]:
+                frequency = Frequency.TWICE_DAILY
+            elif freq_str in ["weekly", "week", "w"]:
+                frequency = Frequency.WEEKLY
+            else:
+                await update.message.reply_text(
+                    "❌ *Invalid Frequency*\n\n"
+                    "Valid options: `daily`, `twice_daily`, `weekly`\n\n"
+                    "Example: `/schedule 09:00 daily`",
+                    parse_mode="Markdown",
+                )
+                return
+
+        # Parse timezone (optional)
+        timezone = None
+        if len(args) > 2:
+            timezone = args[2]
+            try:
+                from zoneinfo import ZoneInfo
+
+                ZoneInfo(timezone)  # Validate timezone
+            except Exception:
+                await update.message.reply_text(
+                    f"❌ *Invalid Timezone*\n\n"
+                    f"'{timezone}' is not a valid timezone.\n\n"
+                    "Examples: `America/New_York`, `Europe/London`, `Asia/Tokyo`\n\n"
+                    "See: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones",
+                    parse_mode="Markdown",
+                )
+                return
+
+        # Set the schedule
+        try:
+            self.scheduler.set_schedule(
+                user_id=user.id,
+                book_id=book.id or 0,
+                delivery_time=time_str,
+                frequency=frequency,
+                timezone=timezone,
+            )
+
+            frequency_display = {
+                Frequency.DAILY: "daily",
+                Frequency.TWICE_DAILY: "every 12 hours",
+                Frequency.WEEKLY: "weekly",
+            }.get(frequency, "daily")
+
+            effective_tz = timezone or user.timezone
+
+            await update.message.reply_text(
+                f"✅ *Schedule Set!*\n\n"
+                f"📚 *Book:* {book.title}\n"
+                f"⏰ *Time:* {time_str}\n"
+                f"📅 *Frequency:* {frequency_display}\n"
+                f"🌍 *Timezone:* {effective_tz}\n\n"
+                f"You'll receive snippets automatically at your scheduled time.\n\n"
+                f"Use /pause to temporarily stop deliveries or /resume to restart them.",
+                parse_mode="Markdown",
+            )
+            logger.info(
+                f"User {telegram_id} set schedule: {time_str} {frequency.value} for book {book.id}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error setting schedule for user {telegram_id}: {e}", exc_info=True
+            )
+            await update.message.reply_text(
+                f"❌ *Error Setting Schedule*\n\n"
+                f"An error occurred: {str(e)}\n\n"
+                "Please try again or contact support.",
+                parse_mode="Markdown",
+            )
 
     async def _handle_unrecognized_command(
         self,
