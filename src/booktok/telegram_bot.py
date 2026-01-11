@@ -663,11 +663,11 @@ class TelegramBotInterface:
             try:
                 await update.message.reply_text(
                     sanitized_summary,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
             except BadRequest as e:
                 logger.warning(
-                    f"Failed to send summary with Markdown: {e}. Retrying without formatting."
+                    f"Failed to send summary with HTML: {e}. Retrying without formatting."
                 )
                 await update.message.reply_text(
                     sanitized_summary,

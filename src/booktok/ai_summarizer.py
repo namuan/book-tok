@@ -107,6 +107,12 @@ class AISummarizer:
         prompt_parts.append(
             "Provide a concise and engaging summary that captures the key points."
         )
+        prompt_parts.append(
+            "Format your response using HTML tags for Telegram: <b>bold</b>, <i>italic</i>, <u>underline</u>, <code>code</code>."
+        )
+        prompt_parts.append(
+            "Use <b>headings</b> for sections, and keep formatting clean and readable."
+        )
         prompt_parts.append("\n=== CONTEXT (Previous Page) ===")
         if previous_snippet:
             prompt_parts.append(previous_snippet)
