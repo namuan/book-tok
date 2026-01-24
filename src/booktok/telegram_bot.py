@@ -15,6 +15,8 @@ from telegram.ext import (
     filters,
 )
 
+from bs4 import BeautifulSoup
+
 from booktok.book_processor import BookProcessor
 from booktok.book_scanner import BookScanner
 from booktok.config import AppConfig
@@ -34,6 +36,71 @@ from booktok.ai_summarizer import AISummarizer
 
 
 logger = logging.getLogger(__name__)
+
+
+def clean_html_for_telegram(text: str) -> str:
+    """Clean and format HTML for Telegram message requirements.
+
+    Converts unsupported block tags to newlines/bullets and strips
+    unsupported inline tags while keeping content.
+    """
+    if not text:
+        return ""
+
+    soup = BeautifulSoup(text, "html.parser")
+
+    # Define supported tags
+    ALLOWED_TAGS = [
+        "b",
+        "strong",
+        "i",
+        "em",
+        "u",
+        "ins",
+        "s",
+        "strike",
+        "del",
+        "code",
+        "pre",
+    ]
+
+    # Handle line breaks first
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+
+    # Handle list items
+    for li in soup.find_all("li"):
+        # Add bullet point and newline
+        new_content = f"• {li.get_text()} \n"
+        li.replace_with(new_content)
+
+    # Handle headings (make them bold and add newline)
+    for tag_name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+        for tag in soup.find_all(tag_name):
+            new_b = soup.new_tag("b")
+            new_b.string = tag.get_text()
+            tag.replace_with(new_b)
+            new_b.insert_after("\n")
+
+    # Handle paragraphs (add double newline for spacing)
+    for p in soup.find_all("p"):
+        p.insert_after("\n\n")
+        p.unwrap()
+
+    # Remove all other unsupported tags but keep content
+    for tag in soup.find_all(True):
+        if tag.name not in ALLOWED_TAGS:
+            tag.unwrap()
+
+    # Get text and clean up excessive whitespace
+    cleaned_text = str(soup)
+
+    # Fix multiple newlines (more than 2)
+    import re
+
+    cleaned_text = re.sub(r"\n{3,}", "\n\n", cleaned_text)
+
+    return cleaned_text.strip()
 
 
 def sanitize_text_for_telegram(text: str) -> str:
@@ -660,18 +727,23 @@ class TelegramBotInterface:
                 [s.content for s in snippets], previous_snippet
             )
 
-            sanitized_summary = sanitize_text_for_telegram(summary)
+            # Clean and format the summary specifically for Telegram HTML
+            formatted_summary = clean_html_for_telegram(summary)
+            safe_summary = sanitize_text_for_telegram(formatted_summary)
+
             try:
                 await update.message.reply_text(
-                    sanitized_summary,
+                    safe_summary,
                     parse_mode="HTML",
                 )
             except BadRequest as e:
                 logger.warning(
-                    f"Failed to send summary with HTML: {e}. Retrying without formatting."
+                    f"Failed to send summary with HTML: {e}. Retrying with plain text."
                 )
+                # Fallback: Strip all tags for clean plain text
+                plain_text = BeautifulSoup(summary, "html.parser").get_text()
                 await update.message.reply_text(
-                    sanitized_summary,
+                    sanitize_text_for_telegram(plain_text),
                     parse_mode=None,
                 )
 
