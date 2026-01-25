@@ -14,6 +14,7 @@ from booktok.database import (
 )
 from booktok.delivery_scheduler import AutomatedDeliveryRunner
 from booktok.repository import DatabaseConnectionManager
+from booktok.summary_preprocessor import SummaryPreprocessorRunner
 from booktok.telegram_bot import TelegramBotInterface
 
 
@@ -33,6 +34,7 @@ class BookTokApplication:
         self.db_manager: Optional[DatabaseConnectionManager] = None
         self.bot_interface: Optional[TelegramBotInterface] = None
         self.delivery_runner: Optional[AutomatedDeliveryRunner] = None
+        self.preprocessor_runner: Optional[SummaryPreprocessorRunner] = None
         self._running = False
 
     def initialize(self) -> None:
@@ -81,6 +83,17 @@ class BookTokApplication:
         )
         logger.info("Delivery runner initialized")
 
+        # Initialize summary preprocessor if OpenRouter is configured
+        if self.config.openrouter.api_key:
+            self.preprocessor_runner = SummaryPreprocessorRunner(
+                db_manager=self.db_manager,
+                openrouter_config=self.config.openrouter,
+                check_interval_seconds=300,  # Check every 5 minutes
+            )
+            logger.info("Summary preprocessor runner initialized")
+        else:
+            logger.info("Summary preprocessor disabled (no OpenRouter API key)")
+
         logger.info("BookTok application initialized successfully")
 
     async def start(self) -> None:
@@ -101,6 +114,10 @@ class BookTokApplication:
             await self.delivery_runner.start()  # type: ignore[union-attr]
             logger.info("Delivery runner started")
 
+            if self.preprocessor_runner:
+                await self.preprocessor_runner.start()
+                logger.info("Summary preprocessor runner started")
+
             logger.info("BookTok application is running")
 
             while self._running:
@@ -114,6 +131,10 @@ class BookTokApplication:
         """Stop the application and cleanup resources."""
         logger.info("Stopping BookTok application...")
         self._running = False
+
+        if self.preprocessor_runner:
+            await self.preprocessor_runner.stop()
+            logger.info("Summary preprocessor runner stopped")
 
         if self.delivery_runner:
             await self.delivery_runner.stop()
