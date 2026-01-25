@@ -236,9 +236,12 @@ class TelegramBotInterface:
         self.application.add_handler(CommandHandler("resume", self._handle_resume))
         self.application.add_handler(CommandHandler("schedule", self._handle_schedule))
 
-        # Callback query handler for book selection
+        # Callback query handler for book selection (both new and existing books)
         self.application.add_handler(
-            CallbackQueryHandler(self._handle_book_selection, pattern=r"^select_book:")
+            CallbackQueryHandler(
+                self._handle_book_selection,
+                pattern=r"^select_(new_book|existing_book):",
+            )
         )
 
         self.application.add_handler(
@@ -326,7 +329,8 @@ class TelegramBotInterface:
     ) -> None:
         """Handle the /books command.
 
-        Lists all available books from the configured books directory.
+        Lists all available books from the configured books directory
+        and books already in the database.
 
         Args:
             update: Telegram update object.
@@ -344,10 +348,14 @@ class TelegramBotInterface:
             )
             return
 
-        # Scan for available books
-        books = self.book_scanner.scan()
+        # Scan for available books in the directory
+        books_in_dir = self.book_scanner.scan()
 
-        if not books:
+        # Get books from database that have been completed
+        books_in_db = self.book_repo.list_by_status(BookStatus.COMPLETED)
+
+        # If neither list has books, show a message
+        if not books_in_dir and not books_in_db:
             await update.message.reply_text(
                 "📚 *No Books Available*\n\n"
                 f"No books found in the configured directory.\n\n"
@@ -357,27 +365,46 @@ class TelegramBotInterface:
             )
             return
 
-        # Build message with book list
-        message_lines = ["📚 *Available Books*\n"]
-        message_lines.append(f"Found {len(books)} book(s):\n")
-        message_lines.append("Select a book to start reading:\n")
-
-        # Create inline keyboard buttons for book selection
+        # Build message with two sections
+        message_lines = ["📚 *Book Management*\n"]
         keyboard = []
-        for idx, book in enumerate(books, start=1):
-            size_str = self.book_scanner.format_size(book.size_bytes)
-            file_type = book.file_type.value.upper()
-            message_lines.append(
-                f"{idx}. *{book.display_name}*\n" f"   📊 {file_type} | {size_str}"
-            )
 
-            # Add button for this book
-            button_text = f"{idx}. {book.display_name[:30]}"
-            # Use index instead of filename to avoid callback_data 64 byte limit
-            callback_data = f"select_book:{idx}"
-            keyboard.append(
-                [InlineKeyboardButton(button_text, callback_data=callback_data)]
-            )
+        # Section 1: Books in Directory (to process)
+        if books_in_dir:
+            message_lines.append("📂 *All Books in Directory*\n")
+            message_lines.append(f"Found {len(books_in_dir)} book(s) to process:\n")
+            for idx, book in enumerate(books_in_dir, start=1):
+                size_str = self.book_scanner.format_size(book.size_bytes)
+                file_type = book.file_type.value.upper()
+                message_lines.append(
+                    f"{idx}. *{book.display_name}*\n" f"   📊 {file_type} | {size_str}"
+                )
+
+                # Add button for processing this book
+                button_text = f"📥 {idx}. {book.display_name[:20]}"
+                callback_data = f"select_new_book:{idx}"
+                keyboard.append(
+                    [InlineKeyboardButton(button_text, callback_data=callback_data)]
+                )
+
+            message_lines.append("\n")
+
+        # Section 2: Books in Database (to select as current)
+        if books_in_db:
+            message_lines.append("✅ *Your Books in Database*\n")
+            message_lines.append(f"Found {len(books_in_db)} processed book(s):\n")
+            for idx, book in enumerate(books_in_db, start=1):
+                progress_info = f"{book.total_snippets} snippets"
+                message_lines.append(
+                    f"{idx}. *{book.title}*\n" f"   📖 {progress_info}"
+                )
+
+                # Add button for selecting this book
+                button_text = f"📖 {idx}. {book.title[:20]}"
+                callback_data = f"select_existing_book:{book.id}"
+                keyboard.append(
+                    [InlineKeyboardButton(button_text, callback_data=callback_data)]
+                )
 
         message = "\n".join(message_lines)
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -388,7 +415,10 @@ class TelegramBotInterface:
             reply_markup=reply_markup,
         )
 
-        logger.info(f"User {telegram_id} listed {len(books)} available books")
+        logger.info(
+            f"User {telegram_id} listed {len(books_in_dir)} directory books "
+            f"and {len(books_in_db)} database books"
+        )
 
     async def _handle_book_selection(
         self,
@@ -397,7 +427,7 @@ class TelegramBotInterface:
     ) -> None:
         """Handle book selection from inline keyboard.
 
-        Processes the selected book, generates snippets, and starts user progress.
+        Routes to either new book processing or existing book selection.
 
         Args:
             update: Telegram update object with callback query.
@@ -408,6 +438,33 @@ class TelegramBotInterface:
             return
 
         await query.answer()
+
+        callback_data = query.data or ""
+
+        # Route to appropriate handler
+        if callback_data.startswith("select_new_book:"):
+            await self._handle_new_book_selection(update, context)
+        elif callback_data.startswith("select_existing_book:"):
+            await self._handle_existing_book_selection(update, context)
+        else:
+            await query.edit_message_text("Invalid selection. Please try again.")
+
+    async def _handle_new_book_selection(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle selection of a new book from the directory.
+
+        Processes the selected book, generates snippets, and starts user progress.
+
+        Args:
+            update: Telegram update object with callback query.
+            context: Callback context.
+        """
+        query = update.callback_query
+        if query is None or update.effective_user is None:
+            return
 
         telegram_id = update.effective_user.id
         user = self.user_repo.get_by_telegram_id(telegram_id)
@@ -420,13 +477,13 @@ class TelegramBotInterface:
 
         # Extract index from callback data
         callback_data = query.data or ""
-        if not callback_data.startswith("select_book:"):
+        if not callback_data.startswith("select_new_book:"):
             await query.edit_message_text("Invalid selection. Please try again.")
             return
 
         try:
             # We communicate via index to keep callback_data short
-            idx = int(callback_data.replace("select_book:", ""))
+            idx = int(callback_data.replace("select_new_book:", ""))
         except ValueError:
             await query.edit_message_text(
                 "Invalid book selection format. Please try /books again."
@@ -582,6 +639,105 @@ class TelegramBotInterface:
             await query.edit_message_text(
                 "\u274c *Error*\n\n"
                 "An error occurred while processing the book.\n"
+                "Please try again later or contact support.",
+                parse_mode="Markdown",
+            )
+
+    async def _handle_existing_book_selection(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """Handle selection of an existing book from the database.
+
+        Sets the selected book as the user's active book without processing.
+
+        Args:
+            update: Telegram update object with callback query.
+            context: Callback context.
+        """
+        query = update.callback_query
+        if query is None or update.effective_user is None:
+            return
+
+        telegram_id = update.effective_user.id
+        user = self.user_repo.get_by_telegram_id(telegram_id)
+
+        if user is None or user.id is None:
+            await query.edit_message_text(
+                "Please use /start first to create your profile.",
+            )
+            return
+
+        # Extract book ID from callback data
+        callback_data = query.data or ""
+        if not callback_data.startswith("select_existing_book:"):
+            await query.edit_message_text("Invalid selection. Please try again.")
+            return
+
+        try:
+            book_id = int(callback_data.replace("select_existing_book:", ""))
+        except ValueError:
+            await query.edit_message_text(
+                "Invalid book selection format. Please try /books again."
+            )
+            return
+
+        # Get the book from database
+        book = self.book_repo.get_by_id(book_id)
+        if book is None:
+            await query.edit_message_text(
+                "Book not found. The book may have been deleted.\n"
+                "Please use /books to see the current list."
+            )
+            return
+
+        try:
+            # Check if user has active progress on a different book
+            progress_list = self.progress_repo.list_by_user(user.id)
+            for progress in progress_list:
+                if not progress.is_completed and progress.book_id != book.id:
+                    logger.info(
+                        f"User {telegram_id} switching from book {progress.book_id} "
+                        f"to book {book.id}"
+                    )
+
+            # Initialize or reset user progress for this book
+            existing_progress = self.progress_repo.get_by_user_and_book(
+                user.id, book_id
+            )
+
+            if existing_progress is not None:
+                # Resume existing progress - update will refresh the updated_at timestamp
+                # making this the active book
+                self.progress_repo.update(existing_progress)
+                progress = existing_progress
+                logger.info(
+                    f"Resumed progress for user {telegram_id} on book '{book.title}' at position {progress.current_position}"
+                )
+            else:
+                # Create new progress for this book
+                progress = self.progress_repo.initialize_progress(user.id, book_id)
+                logger.info(
+                    f"Initialized progress for user {telegram_id} on book '{book.title}'"
+                )
+
+            # Send success message
+            title_safe = sanitize_text_for_telegram(book.title)
+            await query.edit_message_text(
+                f"\u2705 *Book Selected*\n\n"
+                f"*{title_safe}*\n\n"
+                f"📚 Total snippets: {book.total_snippets}\n"
+                f"📍 Your position: {progress.current_position + 1}/{book.total_snippets}\n\n"
+                "Use /next to start reading!",
+                parse_mode="Markdown",
+            )
+
+        except Exception as e:
+            logger.error(f"Error selecting existing book: {e}", exc_info=True)
+            await query.edit_message_text(
+                "\u274c *Error*\n\n"
+                "An error occurred while selecting the book.\n"
                 "Please try again later or contact support.",
                 parse_mode="Markdown",
             )
