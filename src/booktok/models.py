@@ -230,3 +230,36 @@ class DeliverySchedule:
     def __post_init__(self) -> None:
         """Validate after initialization."""
         self.validate()
+
+
+@dataclass
+class SnippetSummary:
+    """Represents a pre-generated summary for a range of snippets."""
+
+    book_id: int
+    start_position: int
+    end_position: int
+    summary_content: str
+    id: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+    def validate(self) -> None:
+        """Validate the snippet summary data.
+
+        Raises:
+            ValidationError: If validation fails.
+        """
+        if not isinstance(self.book_id, int) or self.book_id <= 0:
+            raise ValidationError("book_id must be a positive integer")
+        if not isinstance(self.start_position, int) or self.start_position < 0:
+            raise ValidationError("start_position must be a non-negative integer")
+        if not isinstance(self.end_position, int) or self.end_position < 0:
+            raise ValidationError("end_position must be a non-negative integer")
+        if self.start_position > self.end_position:
+            raise ValidationError("start_position must be <= end_position")
+        if not isinstance(self.summary_content, str) or not self.summary_content.strip():
+            raise ValidationError("summary_content must be a non-empty string")
+
+    def __post_init__(self) -> None:
+        """Validate after initialization."""
+        self.validate()

@@ -28,6 +28,7 @@ from booktok.repository import (
     DatabaseConnectionManager,
     DeliveryScheduleRepository,
     SnippetRepository,
+    SnippetSummaryRepository,
     UserProgressRepository,
     UserRepository,
 )
@@ -203,6 +204,7 @@ class TelegramBotInterface:
         self.user_repo = UserRepository(db_manager)
         self.book_repo = BookRepository(db_manager)
         self.snippet_repo = SnippetRepository(db_manager)
+        self.summary_repo = SnippetSummaryRepository(db_manager)
         self.progress_repo = UserProgressRepository(db_manager)
         self.schedule_repo = DeliveryScheduleRepository(db_manager)
         self.scheduler = DeliveryScheduler(db_manager)
@@ -837,51 +839,74 @@ class TelegramBotInterface:
         if self.ai_summarizer:
             # AI Summarization Mode
             target_count = self.config.openrouter.summary_page_count
-            snippets = self.snippet_repo.get_range_by_book(
-                active_progress.book_id,
-                next_position,
-                next_position + target_count - 1,
+            end_position = next_position + target_count - 1
+
+            # Check for pre-generated summary first
+            existing_summary = self.summary_repo.get_by_position(
+                active_progress.book_id, next_position, end_position
             )
 
-            if not snippets:
+            if existing_summary:
+                # Use pre-generated summary
+                logger.info(
+                    f"Using pre-generated summary for book {book.title} "
+                    f"positions {next_position}-{end_position}"
+                )
+                summary = existing_summary.summary_content
+                # Use the actual positions from the summary
+                snippets_count = existing_summary.end_position - existing_summary.start_position + 1
+            else:
+                # Fall back to on-demand generation
+                logger.info(
+                    f"No pre-generated summary found for book {book.title} "
+                    f"positions {next_position}-{end_position}, generating on-demand"
+                )
+                snippets = self.snippet_repo.get_range_by_book(
+                    active_progress.book_id,
+                    next_position,
+                    end_position,
+                )
+
+                if not snippets:
+                    title_safe = sanitize_text_for_telegram(book.title)
+                    await update.message.reply_text(
+                        f"📚 *{title_safe}*\n\n"
+                        "No more snippets available. You've reached the end!",
+                        parse_mode="Markdown",
+                    )
+                    return
+
+                # Fetch previous context if available
+                previous_snippet = None
+                if next_position > 0:
+                    prev_obj = self.snippet_repo.get_by_book_and_position(
+                        active_progress.book_id, next_position - 1
+                    )
+                    if prev_obj:
+                        previous_snippet = prev_obj.content
+
+                start_page = snippets[0].position + 1
+                end_page = snippets[-1].position + 1
                 title_safe = sanitize_text_for_telegram(book.title)
-                await update.message.reply_text(
-                    f"📚 *{title_safe}*\n\n"
-                    "No more snippets available. You've reached the end!",
-                    parse_mode="Markdown",
-                )
-                return
+                status_msg = f"🤖 *{title_safe}* Generating summary for pages {start_page}-{end_page}..."
+                try:
+                    await update.message.reply_text(
+                        status_msg,
+                        parse_mode="Markdown",
+                    )
+                except BadRequest as e:
+                    logger.warning(
+                        f"Failed to send status with Markdown: {e}. Retrying without formatting."
+                    )
+                    await update.message.reply_text(
+                        status_msg,
+                        parse_mode=None,
+                    )
 
-            # Fetch previous context if available
-            previous_snippet = None
-            if next_position > 0:
-                prev_obj = self.snippet_repo.get_by_book_and_position(
-                    active_progress.book_id, next_position - 1
+                summary = await self.ai_summarizer.summarize_snippets(
+                    [s.content for s in snippets], previous_snippet
                 )
-                if prev_obj:
-                    previous_snippet = prev_obj.content
-
-            start_page = snippets[0].position + 1
-            end_page = snippets[-1].position + 1
-            title_safe = sanitize_text_for_telegram(book.title)
-            status_msg = f"🤖 *{title_safe}* Generating summary for pages {start_page}-{end_page}..."
-            try:
-                await update.message.reply_text(
-                    status_msg,
-                    parse_mode="Markdown",
-                )
-            except BadRequest as e:
-                logger.warning(
-                    f"Failed to send status with Markdown: {e}. Retrying without formatting."
-                )
-                await update.message.reply_text(
-                    status_msg,
-                    parse_mode=None,
-                )
-
-            summary = await self.ai_summarizer.summarize_snippets(
-                [s.content for s in snippets], previous_snippet
-            )
+                snippets_count = len(snippets)
 
             # Clean and format the summary specifically for Telegram HTML
             formatted_summary = clean_html_for_telegram(summary)
@@ -904,7 +929,7 @@ class TelegramBotInterface:
                 )
 
             # Advance logical position
-            new_position = next_position + len(snippets)
+            new_position = next_position + snippets_count
             active_progress.current_position = new_position
 
             # Show progress

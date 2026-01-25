@@ -169,6 +169,21 @@ def create_tables(conn: sqlite3.Connection, verify_only: bool = False) -> None:
             )
         """,
         ),
+        (
+            "snippet_summaries",
+            """
+            CREATE TABLE IF NOT EXISTS snippet_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id INTEGER NOT NULL,
+                start_position INTEGER NOT NULL,
+                end_position INTEGER NOT NULL,
+                summary_content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+                UNIQUE(book_id, start_position, end_position)
+            )
+        """,
+        ),
     ]
 
     for table_name, create_sql in tables:
@@ -198,6 +213,14 @@ def create_tables(conn: sqlite3.Connection, verify_only: bool = False) -> None:
         (
             "idx_delivery_schedules_next",
             "CREATE INDEX IF NOT EXISTS idx_delivery_schedules_next ON delivery_schedules(next_delivery_at)",
+        ),
+        (
+            "idx_snippet_summaries_book_id",
+            "CREATE INDEX IF NOT EXISTS idx_snippet_summaries_book_id ON snippet_summaries(book_id)",
+        ),
+        (
+            "idx_snippet_summaries_positions",
+            "CREATE INDEX IF NOT EXISTS idx_snippet_summaries_positions ON snippet_summaries(book_id, start_position, end_position)",
         ),
     ]
 

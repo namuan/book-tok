@@ -14,6 +14,7 @@ from booktok.models import (
     FileType,
     Frequency,
     Snippet,
+    SnippetSummary,
     User,
     UserProgress,
 )
@@ -1103,3 +1104,151 @@ class MigrationManager:
         conn = self.db.get_connection()
         cursor = conn.execute("SELECT name FROM migrations ORDER BY applied_at ASC")
         return [row["name"] for row in cursor.fetchall()]
+
+
+class SnippetSummaryRepository:
+    """Repository for SnippetSummary CRUD operations."""
+
+    def __init__(self, db_manager: DatabaseConnectionManager) -> None:
+        """Initialize the repository.
+
+        Args:
+            db_manager: Database connection manager.
+        """
+        self.db = db_manager
+
+    def create(self, summary: SnippetSummary) -> SnippetSummary:
+        """Create a new snippet summary in the database.
+
+        Args:
+            summary: SnippetSummary object to create.
+
+        Returns:
+            SnippetSummary with assigned ID.
+        """
+        with self.db.transaction() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO snippet_summaries
+                    (book_id, start_position, end_position, summary_content)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    summary.book_id,
+                    summary.start_position,
+                    summary.end_position,
+                    summary.summary_content,
+                ),
+            )
+            summary.id = cursor.lastrowid
+        return summary
+
+    def get_by_id(self, summary_id: int) -> Optional[SnippetSummary]:
+        """Retrieve a summary by its ID.
+
+        Args:
+            summary_id: Database ID of the summary.
+
+        Returns:
+            SnippetSummary if found, None otherwise.
+        """
+        conn = self.db.get_connection()
+        cursor = conn.execute(
+            "SELECT * FROM snippet_summaries WHERE id = ?", (summary_id,)
+        )
+        row = cursor.fetchone()
+        return self._row_to_summary(row) if row else None
+
+    def get_by_position(
+        self, book_id: int, start_position: int, end_position: int
+    ) -> Optional[SnippetSummary]:
+        """Retrieve a summary for a specific position range.
+
+        Args:
+            book_id: Database ID of the book.
+            start_position: Starting position of the summary.
+            end_position: Ending position of the summary.
+
+        Returns:
+            SnippetSummary if found, None otherwise.
+        """
+        conn = self.db.get_connection()
+        cursor = conn.execute(
+            """
+            SELECT * FROM snippet_summaries
+            WHERE book_id = ? AND start_position = ? AND end_position = ?
+            """,
+            (book_id, start_position, end_position),
+        )
+        row = cursor.fetchone()
+        return self._row_to_summary(row) if row else None
+
+    def list_by_book(self, book_id: int) -> list[SnippetSummary]:
+        """List all summaries for a book.
+
+        Args:
+            book_id: Database ID of the book.
+
+        Returns:
+            List of SnippetSummary objects ordered by start_position.
+        """
+        conn = self.db.get_connection()
+        cursor = conn.execute(
+            """
+            SELECT * FROM snippet_summaries
+            WHERE book_id = ?
+            ORDER BY start_position ASC
+            """,
+            (book_id,),
+        )
+        return [self._row_to_summary(row) for row in cursor.fetchall()]
+
+    def delete(self, summary_id: int) -> bool:
+        """Delete a summary from the database.
+
+        Args:
+            summary_id: Database ID of the summary.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        with self.db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM snippet_summaries WHERE id = ?", (summary_id,)
+            )
+            return cursor.rowcount > 0
+
+    def delete_by_book(self, book_id: int) -> int:
+        """Delete all summaries for a book.
+
+        Args:
+            book_id: Database ID of the book.
+
+        Returns:
+            Number of summaries deleted.
+        """
+        with self.db.transaction() as conn:
+            cursor = conn.execute(
+                "DELETE FROM snippet_summaries WHERE book_id = ?", (book_id,)
+            )
+            return cursor.rowcount
+
+    def _row_to_summary(self, row: sqlite3.Row) -> SnippetSummary:
+        """Convert a database row to a SnippetSummary object.
+
+        Args:
+            row: Database row.
+
+        Returns:
+            SnippetSummary object.
+        """
+        return SnippetSummary(
+            id=row["id"],
+            book_id=row["book_id"],
+            start_position=row["start_position"],
+            end_position=row["end_position"],
+            summary_content=row["summary_content"],
+            created_at=datetime.fromisoformat(row["created_at"])
+            if row["created_at"]
+            else None,
+        )

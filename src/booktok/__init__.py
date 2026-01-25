@@ -7,6 +7,7 @@ from booktok.models import (
     FileType,
     Frequency,
     Snippet,
+    SnippetSummary,
     User,
     UserProgress,
     ValidationError,
@@ -83,6 +84,10 @@ from booktok.config import (
     setup_logging,
     validate_config,
 )
+from booktok.summary_preprocessor import (
+    SummaryPreprocessor,
+    SummaryPreprocessorRunner,
+)
 
 
 def main() -> None:
@@ -141,6 +146,9 @@ __all__ = [
     "SnippetGenerationError",
     "SnippetGenerationResult",
     "SnippetGenerator",
+    "SnippetSummary",
+    "SummaryPreprocessor",
+    "SummaryPreprocessorRunner",
     "TelegramBotInterface",
     "TelegramConfig",
     "UnsupportedFileTypeError",
