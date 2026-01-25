@@ -6,7 +6,7 @@ from typing import Optional
 
 from booktok.ai_summarizer import AISummarizer
 from booktok.config import OpenRouterConfig
-from booktok.models import SnippetSummary
+from booktok.models import BookStatus, SnippetSummary
 from booktok.repository import (
     BookRepository,
     DatabaseConnectionManager,
@@ -167,6 +167,11 @@ class SummaryPreprocessor:
 
         Returns:
             List of (start_position, end_position) tuples.
+
+        Note:
+            Current implementation loads all summaries into memory.
+            For books with thousands of summaries, this could be optimized
+            with a database query to find gaps directly.
         """
         total_snippets = self.snippet_repo.count_by_book(book_id)
         if total_snippets == 0:
@@ -280,32 +285,32 @@ class SummaryPreprocessorRunner:
             logger.error("Preprocessor not initialized")
             return
 
-        # Get all completed books
-        conn = self.db_manager.get_connection()
-        cursor = conn.execute(
-            "SELECT id FROM books WHERE status = 'completed' ORDER BY id ASC"
+        # Get all completed books using the repository
+        completed_books = self.book_repo.list_by_status(
+            BookStatus.COMPLETED  # type: ignore[attr-defined]
         )
-        book_ids = [row["id"] for row in cursor.fetchall()]
 
-        if not book_ids:
+        if not completed_books:
             logger.debug("No completed books found for pre-processing")
             return
 
-        logger.debug(f"Checking {len(book_ids)} books for summary pre-processing")
+        logger.debug(
+            f"Checking {len(completed_books)} books for summary pre-processing"
+        )
 
-        for book_id in book_ids:
-            if not self._running:
+        for book in completed_books:
+            if not self._running or book.id is None:
                 break
 
             # Check if book needs processing
-            missing = self._preprocessor.get_missing_summary_positions(book_id)
+            missing = self._preprocessor.get_missing_summary_positions(book.id)
             if missing:
                 logger.info(
-                    f"Book {book_id} needs {len(missing)} summaries, starting pre-processing"
+                    f"Book {book.id} needs {len(missing)} summaries, starting pre-processing"
                 )
                 try:
-                    await self._preprocessor.preprocess_book(book_id)
+                    await self._preprocessor.preprocess_book(book.id)
                 except Exception as e:
                     logger.error(
-                        f"Error pre-processing book {book_id}: {e}", exc_info=True
+                        f"Error pre-processing book {book.id}: {e}", exc_info=True
                     )

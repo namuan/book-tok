@@ -853,7 +853,8 @@ class TelegramBotInterface:
                     f"positions {next_position}-{end_position}"
                 )
                 summary = existing_summary.summary_content
-                snippets_count = end_position - next_position + 1
+                # Use the actual positions from the summary
+                snippets_count = existing_summary.end_position - existing_summary.start_position + 1
             else:
                 # Fall back to on-demand generation
                 logger.info(
